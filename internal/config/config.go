@@ -40,6 +40,11 @@ type Config struct {
 	// TSAURL is the RFC 3161 timestamp authority URL (signing).
 	TSAURL string `toml:"tsa_url"`
 
+	// DSSHelperJar is the path to the EU DSS helper jar used by the XAdES
+	// profile. Precedence at the CLI: --dss-helper > $OPENMDSIGN_DSS_HELPER >
+	// this field > the built-in default build path.
+	DSSHelperJar string `toml:"dss_helper_jar"`
+
 	// Daemon holds settings for the `openmdsignd` local HTTPS daemon. These are
 	// consumed only by the daemon front-end; the CLI ignores them.
 	Daemon DaemonConfig `toml:"daemon"`
