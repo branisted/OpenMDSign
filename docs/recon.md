@@ -6,6 +6,14 @@ This document captures (1) established facts about the vendor PKCS#11 modules,
 the official vendor application, so we can determine the signature profile
 (XAdES / CAdES / PAdES) before writing any signing code.
 
+> **Update (2026-07-17): profile determined by static analysis — see
+> `docs/decisions.md`.** Vendor jar `PKCS11CardReader-2.0.jar` shows arbitrary
+> files are signed as **XAdES** (IAIK `iaik.xml.crypto.xades`; XAdES-T/-C,
+> detached or enveloping, RSA+SHA-256) and PDFs as **PAdES** (iText). No CAdES
+> signer exists. The reference-signature procedure in §3 is still needed to pin
+> the exact sub-level (T vs C/LT/LTA) and packaging (standalone XAdES `.xml` vs
+> ASiC-E zip) before Phase 2.
+
 ---
 
 ## 1. Vendor PKCS#11 module facts (established)

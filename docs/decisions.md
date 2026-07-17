@@ -72,6 +72,45 @@ is owned entirely by the caller.
 - A PIN is never passed to a `slog` call, an error string, or any serialized
   field. `--pin-stdin` is offered so the PIN stays out of shell history.
 
+## Signature profile: RESOLVED by static analysis of the vendor code (2026-07-17)
+
+The profile no longer has to wait for a runtime reference signature to be *named*
+(though one is still needed to pin the exact sub-level — see recon.md §3). Static
+inspection of the vendor jar
+`moldsign2412unbundled/STISC/MoldSign/lib/PKCS11CardReader-2.0.jar` — class names
+and UTF-8 constant-pool entries only; **no bytecode was disassembled to source and
+no vendor binary is copied into this repo** — shows:
+
+- **Arbitrary files → XAdES**, implemented on IAIK's `iaik.xml.crypto.xades`.
+  `SignXAdESWorker` references `XAdES-T`, `XAdES-C`, `Detached`,
+  `prepareSignInfoEnveloping`, `DataObjectFormat`, `QualifyingProperties`, digest
+  `http://www.w3.org/2001/04/xmlenc#sha256`, and `SHA256withRSA`. So the target is
+  **XAdES-T / XAdES-C, detached or enveloping, RSA + SHA-256.** No ASiC-specific
+  strings appeared in the worker, so it may emit a standalone XAdES `.xml` rather
+  than an ASiC-E zip — packaging must be confirmed against a real sample.
+- **PDF files → PAdES**, via iText (`SignPDFWorker`, `sign-9.1.0.jar`).
+- **No CAdES signer exists** — the CMS classes (`EncryptCMSAsymmetricWorker`,
+  `DecryptCMSSymmetricWorker`, …) are for encryption only. Timestamping is a
+  generic RFC 3161 client (`TSPTimeStampProcessor`).
+
+**Consequence — this is the STOP condition below.** The primary file profile is
+XAdES, so we do **not** hand-roll it in Go. Planned split: Go CLI/token/verify
+front-end; XAdES signing delegated to EU DSS (Java); PAdES stays pure-Go via
+`github.com/digitorus/pdfsign`. Final go/no-go on DSS pending user decision +
+one reference sample.
+
+### Endpoints and trust anchors harvested (feed `internal/verify` + config)
+
+- **TSA (RFC 3161):** `http://tsp.pki.gov.md/moldsign2/` (unauthenticated as observed).
+- **Live issuing CA `mdtrustca`:** OCSP `http://mdtrustca.ocsp.pki.md`, CRL
+  `http://pki.md/crl/mdtrustca.crl`, caIssuers `http://pki.md/cer/mdtrustca.cer`.
+- **Trust set:** 19 anchors carved from `trusted.jks` inside the same jar and
+  chain-verified with `openssl`. Two live self-signed roots — `mdtrustrootca`
+  (exp 2040) and `mdtrustca` (exp 2045) — plus legacy `RootCA SIS 2` / `eMoldova`.
+  Leaf CAs (MDQSign, MoldSign QCA 3A, …) verify against them. To be embedded as
+  the built-in verify trust set (do **not** copy the vendor jks; re-fetch anchors
+  from the public PKI URLs above for the repo).
+
 ## XAdES / ASiC-E caveat
 
 If the reference signature turns out to be **XAdES inside an ASiC-E container**
