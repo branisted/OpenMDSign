@@ -27,13 +27,13 @@ is not a separate project — it is a second consumer of the core.
 | Core/CLI | P0 `inspect` recon | ✅ done, hardware-validated |
 | Core/CLI | P1 `sign-raw` proof-of-life | ✅ done, hardware-validated |
 | Core/CLI | **P2a PAdES-B-T signer** | ✅ **done — semnatura.md returns VALID** |
-| Core/CLI | P2b XAdES-T signer (EU DSS) | ⏳ **NEXT — unblocks the daemon** |
+| Core/CLI | P2b XAdES-T signer (EU DSS) | ✅ **done — builds; sw-key integration PASS; awaiting real-token semnatura.md check** |
 | Core/CLI | P3 `verify` + trust anchors | ▫ todo |
 | Core/CLI | P4 LTV / XAdES-C, `/DSS` store | ▫ todo (optional) |
 | Core/CLI | P5 packaging (brew, notarized dmg) | ▫ todo |
 | Daemon | A protocol freeze (`PROTOCOL.md`) | ✅ done |
-| Daemon | B skeleton: HTTPS loopback + 3 routes + CORS + `/certificates` | ▫ todo (can start now) |
-| Daemon | C wire signers + sync PIN/confirm gate | ⛓ **blocked on P2b** |
+| Daemon | B skeleton: HTTPS loopback + 3 routes + CORS + `/certificates` | ✅ done, merged |
+| Daemon | C wire signers + sync PIN/confirm gate | ⏳ **now unblocked (both signers exist)** |
 | Daemon | D TLS trust gate (`localhost.cts.md`) | ▫ todo — has a STOP decision |
 | Daemon | E install/packaging (DNS/hosts, launchd) | ▫ todo |
 
