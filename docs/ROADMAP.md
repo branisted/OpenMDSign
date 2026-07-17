@@ -33,8 +33,8 @@ is not a separate project — it is a second consumer of the core.
 | Core/CLI | P5 packaging (brew, notarized dmg) | ▫ todo |
 | Daemon | A protocol freeze (`PROTOCOL.md`) | ✅ done |
 | Daemon | B skeleton: HTTPS loopback + 3 routes + CORS + `/certificates` | ✅ done, merged |
-| Daemon | C wire signers + sync PIN/confirm gate | ⏳ **now unblocked (both signers exist)** |
-| Daemon | D TLS trust gate (`localhost.cts.md`) | ▫ todo — has a STOP decision |
+| Daemon | C wire signers + sync PIN/confirm gate | ✅ done, merged (PAdES/XAdES doc signing + native PIN/confirm; auth-challenge stubbed) |
+| Daemon | D TLS trust gate (`localhost.cts.md`) | ⏳ **NEXT — STOP decision (DNS→127.0.0.1 confirmed)** |
 | Daemon | E install/packaging (DNS/hosts, launchd) | ▫ todo |
 
 ---
