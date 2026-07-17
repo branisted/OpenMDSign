@@ -81,7 +81,7 @@ func newSignCmd(gf *globalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&f.tokenLabel, "token-label", "", "restrict to a token by label")
 	cmd.Flags().StringVar(&f.keyID, "key-id", "", "signing key/cert CKA_ID in hex (default: auto-select the single CKA_SIGN key)")
 	cmd.Flags().StringVar(&f.file, "file", "", "path to the input document to sign (required)")
-	cmd.Flags().StringVar(&f.out, "out", "", "output path (default ./sign-out/<basename>.signed.pdf for PAdES, .xades.xml for XAdES)")
+	cmd.Flags().StringVar(&f.out, "out", "", "output path (default ./sign-out/<basename>.signed.pdf for PAdES, <filename>.xades for XAdES)")
 	cmd.Flags().StringVar(&f.profile, "profile", "auto", "signature profile: auto | pades | xades")
 	cmd.Flags().StringVar(&f.level, "level", "t", "AdES level: b (no timestamp) | t (RFC 3161 timestamp)")
 	cmd.Flags().StringVar(&f.packaging, "xades-packaging", "detached", "XAdES packaging: detached | enveloping")
@@ -178,12 +178,17 @@ func runSign(cmd *cobra.Command, gf *globalFlags, f *signFlags) error {
 
 	outPath := f.out
 	if outPath == "" {
-		base := strings.TrimSuffix(filepath.Base(f.file), filepath.Ext(f.file))
-		ext := ".signed.pdf"
+		name := filepath.Base(f.file)
 		if profileName == xades.Profile {
-			ext = ".xades.xml"
+			// Match the vendor convention: <original-filename>.xades (keeping the
+			// source extension). MoldSign's validator keys off the .xades
+			// extension, and pairing e.g. test.txt.xades next to test.txt makes
+			// the detached file:/<name> reference resolve cleanly.
+			name = name + ".xades"
+		} else {
+			name = strings.TrimSuffix(name, filepath.Ext(name)) + ".signed.pdf"
 		}
-		outPath = filepath.Join("sign-out", base+ext)
+		outPath = filepath.Join("sign-out", name)
 	}
 
 	// Resolve the DSS helper jar (XAdES only): flag > env > config > default.
