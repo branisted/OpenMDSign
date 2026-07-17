@@ -28,13 +28,13 @@ is not a separate project — it is a second consumer of the core.
 | Core/CLI | P1 `sign-raw` proof-of-life | ✅ done, hardware-validated |
 | Core/CLI | **P2a PAdES-B-T signer** | ✅ **done — VALID via msign.gov.md/#/verify/upload** |
 | Core/CLI | P2b XAdES-T signer (EU DSS) | ✅ **done — VALID in MoldSign app (detached, XAdES-T, cert+TSA+timestamp shown)** |
-| Core/CLI | P3 `verify` + trust anchors | ▫ todo |
+| Core/CLI | P3 `verify` + trust anchors | ⏳ in progress |
 | Core/CLI | P4 LTV / XAdES-C, `/DSS` store | ▫ todo (optional) |
 | Core/CLI | P5 packaging (brew, notarized dmg) | ▫ todo |
 | Daemon | A protocol freeze (`PROTOCOL.md`) | ✅ done |
 | Daemon | B skeleton: HTTPS loopback + 3 routes + CORS + `/certificates` | ✅ done, merged |
 | Daemon | C wire signers + sync PIN/confirm gate | ✅ done, merged (PAdES/XAdES doc signing + native PIN/confirm; auth-challenge stubbed) |
-| Daemon | D TLS trust gate (`localhost.cts.md`) | ⏳ **NEXT — STOP decision (DNS→127.0.0.1 confirmed)** |
+| Daemon | D TLS trust gate (`localhost.cts.md`) | ✅ done — trusted self-signed leaf + `openmdsignd trust install/uninstall/status` |
 | Daemon | E install/packaging (DNS/hosts, launchd) | ▫ todo |
 
 ---
