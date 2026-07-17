@@ -94,10 +94,24 @@ no vendor binary is copied into this repo** — shows:
   generic RFC 3161 client (`TSPTimeStampProcessor`).
 
 **Consequence — this is the STOP condition below.** The primary file profile is
-XAdES, so we do **not** hand-roll it in Go. Planned split: Go CLI/token/verify
-front-end; XAdES signing delegated to EU DSS (Java); PAdES stays pure-Go via
-`github.com/digitorus/pdfsign`. Final go/no-go on DSS pending user decision +
-one reference sample.
+XAdES, so we do **not** hand-roll it in Go.
+
+**Decision (2026-07-17, user-approved): Hybrid — Go front-end + Java EU DSS.**
+- Go owns the CLI, PKCS#11/token access, X.509 parsing, config, and verify.
+- **XAdES** signing is delegated to **EU DSS** (`eu.europa.esig.dss`, Java). The
+  Go `Signer` for the XAdES profile shells out to a small DSS-based helper
+  (bundled jar + JRE, or a locally running helper process). The token stays owned
+  by Go: DSS must sign through a PKCS#11 `SignatureToken` OR Go computes the
+  PKCS#11 signature and DSS assembles the XAdES around a pre-computed value —
+  protocol TBD once the reference sample pins the level/packaging. PIN policy
+  (one attempt, no retry) stays entirely on the Go side regardless.
+- **PAdES** (PDF) stays pure-Go via `github.com/digitorus/pdfsign` +
+  `github.com/digitorus/timestamp`. No Java on the PDF path.
+
+Open sub-decisions, gated on the reference sample: exact XAdES level (T vs
+C/LT/LTA), packaging (standalone `.xml` vs ASiC-E), and the Go↔DSS signing
+protocol (DSS-holds-token vs Go-holds-token). Do not write the XAdES Signer until
+these are known.
 
 ### Endpoints and trust anchors harvested (feed `internal/verify` + config)
 
