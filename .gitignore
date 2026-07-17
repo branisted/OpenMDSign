@@ -1,0 +1,12 @@
+# Proprietary vendor app — never commit or redistribute
+moldsign2412unbundled/
+
+# macOS
+.DS_Store
+
+# Build artifacts
+bin/
+dist/
+
+# Local inspect output
+inspect-out/

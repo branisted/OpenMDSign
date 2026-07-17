@@ -1,0 +1,31 @@
+# openmdsign example configuration (TOML).
+#
+# Precedence: command-line flags > this file > built-in defaults.
+# Copy to ./openmdsign.toml (auto-loaded if present) or pass --config <path>.
+
+# Path to the vendor PKCS#11 shared object (.dylib). REQUIRED for `inspect`.
+# This is an EXTERNAL dependency: openmdsign never ships, copies, or hardcodes
+# it. Point this at wherever the vendor middleware installed the driver for your
+# physical token. Example (comment only — adjust to your install):
+#   module = "/Applications/STISC/MoldSign/native_lib/libeToken.dylib"
+module = ""
+
+# Optional: pin a specific PKCS#11 slot ID. Omit to enumerate all slots.
+# slot = 0
+
+# Optional: select a token by its label.
+# token_label = ""
+
+# Optional: select a key/certificate by CKA_ID (hex).
+# key_id = ""
+
+# --- The following are carried forward for later signing phases (unused in Phase 0) ---
+
+# Path to a PEM bundle of intermediate/root CA certificates.
+# ca_chain = ""
+
+# Override the OCSP responder URL (otherwise read from the cert's AIA extension).
+# ocsp_url = ""
+
+# RFC 3161 timestamp authority URL.
+# tsa_url = ""
