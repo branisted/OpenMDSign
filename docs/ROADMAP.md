@@ -62,7 +62,7 @@ SHA-1 on a PDF job that emitted SHA-256). Drive digest from `signFormat` + profi
 
 | # | Decision | Where | Default lean |
 |---|---|---|---|
-| 1 | `localhost.cts.md:18443` TLS trust model | `PROTOCOL.md §2` | Option 2 — ship our own cert for `localhost.cts.md`, install a one-off local root at setup |
+| 1 | `localhost.cts.md:18443` TLS trust model | `PROTOCOL.md §2` | ✅ **DECIDED (2026-07-18): trusted self-signed LEAF** — per-machine self-signed cert for CN/SAN=localhost.cts.md, added as a trusted SSL anchor in the login keychain via `openmdsignd trust install`. Loopback-only ⇒ minimal blast radius; no CA that can sign other names. DNS→127.0.0.1 already works. |
 | 2 | CORS allowlist scope (reflect-any vs gov allowlist) | `PROTOCOL.md §3` | Strict gov allowlist regardless of vendor behavior |
 | 3 | XAdES-C legacy *references* vs DSS baseline-LT *values* | `profile-spec.md §1` | Target T first; only do -C if a consumer demands the legacy form |
 
