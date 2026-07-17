@@ -39,11 +39,55 @@ type Config struct {
 
 	// TSAURL is the RFC 3161 timestamp authority URL (signing).
 	TSAURL string `toml:"tsa_url"`
+
+	// Daemon holds settings for the `openmdsignd` local HTTPS daemon. These are
+	// consumed only by the daemon front-end; the CLI ignores them.
+	Daemon DaemonConfig `toml:"daemon"`
 }
 
-// Default returns the built-in defaults (all zero/empty).
+// DaemonConfig holds tunables for the `openmdsignd` browser⇄daemon HTTPS server
+// (see docs/PROTOCOL.md). Every field has a built-in default (see DefaultDaemon)
+// so an empty [daemon] table still yields a working, spec-faithful listener.
+type DaemonConfig struct {
+	// HTTPSAddr is the loopback listen address for the primary TLS channel.
+	// PROTOCOL.md §1: https://localhost.cts.md:18443 (loopback only).
+	HTTPSAddr string `toml:"https_addr"`
+
+	// HTTPAddr, when non-empty, additionally binds the plain-HTTP probe listener
+	// (PROTOCOL.md §1: 127.0.0.1:18480). Empty disables it.
+	HTTPAddr string `toml:"http_addr"`
+
+	// Hostname is the TLS server name the browser is hardcoded to reach
+	// (PROTOCOL.md §2: localhost.cts.md). It must resolve to 127.0.0.1.
+	Hostname string `toml:"hostname"`
+
+	// CORSAllowlist is the STRICT set of origins echoed back in
+	// Access-Control-Allow-Origin (PROTOCOL.md §3). An Origin outside this list
+	// receives NO ACAO header. Never reflect-any.
+	CORSAllowlist []string `toml:"cors_allowlist"`
+
+	// DevCertDir, when non-empty, is where the self-signed dev cert+key for
+	// Hostname are cached (dev-cert.pem / dev-key.pem). Empty keeps them
+	// in-memory only. The real publicly-trusted-cert trust gate is Daemon
+	// Phase D — this dev cert is a stand-in and installs no trust anchor.
+	DevCertDir string `toml:"dev_cert_dir"`
+}
+
+// Default returns the built-in defaults (all zero/empty except Daemon, which
+// carries its spec-faithful defaults so the daemon works out of the box).
 func Default() Config {
-	return Config{}
+	return Config{Daemon: DefaultDaemon()}
+}
+
+// DefaultDaemon returns the built-in daemon defaults straight from PROTOCOL.md.
+func DefaultDaemon() DaemonConfig {
+	return DaemonConfig{
+		HTTPSAddr:     "127.0.0.1:18443",
+		HTTPAddr:      "", // plain-HTTP probe listener disabled unless configured
+		Hostname:      "localhost.cts.md",
+		CORSAllowlist: []string{"https://msign.gov.md", "https://mpass.gov.md"},
+		DevCertDir:    "",
+	}
 }
 
 // LoadFile reads and parses a TOML config file at path. A missing file is not

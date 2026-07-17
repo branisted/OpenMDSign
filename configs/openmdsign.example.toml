@@ -29,3 +29,27 @@ module = ""
 
 # RFC 3161 timestamp authority URL.
 # tsa_url = ""
+
+# --- openmdsignd (the browser⇄daemon HTTPS server; see docs/PROTOCOL.md) -------
+# Consumed only by `openmdsignd serve`; the CLI ignores this table. Every field
+# has a spec-faithful default, so an omitted [daemon] table still works. Flags on
+# `serve` override these (precedence: flags > this file > defaults).
+[daemon]
+# Loopback HTTPS listen address (PROTOCOL.md §1–2). The browser is hardcoded to
+# https://localhost.cts.md:18443; that hostname must resolve to 127.0.0.1.
+# https_addr = "127.0.0.1:18443"
+
+# Optional plain-HTTP probe listener (PROTOCOL.md §1). Empty disables it.
+# http_addr = "127.0.0.1:18480"
+
+# TLS server name the browser targets. Must resolve to loopback.
+# hostname = "localhost.cts.md"
+
+# STRICT CORS allowlist (PROTOCOL.md §3). Only these Origins are echoed back in
+# Access-Control-Allow-Origin; anything else gets no ACAO. Never reflect-any.
+# cors_allowlist = ["https://msign.gov.md", "https://mpass.gov.md"]
+
+# Directory to cache the self-signed DEV certificate for `hostname`. Empty keeps
+# it in-memory. NOTE: this is a Phase B stand-in — the real publicly-trusted-cert
+# trust gate is Daemon Phase D. A browser will not trust this dev cert.
+# dev_cert_dir = ""
