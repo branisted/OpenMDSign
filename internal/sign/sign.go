@@ -31,13 +31,27 @@ const (
 	LevelT Level = "t"
 )
 
+// Packaging selects how a XAdES signature relates to the signed data. It is
+// consumed only by the XAdES profile; PAdES ignores it.
+type Packaging string
+
+const (
+	// PackagingDetached references the signed file by URI (file:/<basename>),
+	// digesting the raw file bytes. This is the primary XAdES packaging.
+	PackagingDetached Packaging = "detached"
+	// PackagingEnveloping embeds the base64 file in a trailing ds:Object.
+	PackagingEnveloping Packaging = "enveloping"
+)
+
 // Request describes one signing operation.
 //
 // The Signer is an already-logged-in crypto.Signer (the token). Certificate is
 // its leaf certificate; Chain is the issuer chain (issuing CA + root) used to
 // embed a complete CMS certificate set. TSAURL is consulted only for LevelT.
 type Request struct {
-	// InputPDF is the raw bytes of the document to sign.
+	// InputPDF is the raw bytes of the document to sign. Despite the name it
+	// carries the input bytes for any profile (the XAdES profile signs the same
+	// field's raw bytes); it predates the XAdES profile.
 	InputPDF []byte
 	// InputName is a display name for the input (never a local filesystem path
 	// that could leak into signature metadata).
@@ -54,6 +68,18 @@ type Request struct {
 	Level Level
 	// TSAURL is the RFC 3161 timestamp authority URL (used only for LevelT).
 	TSAURL string
+
+	// --- XAdES-only fields (ignored by the PAdES profile) ---
+
+	// Packaging selects detached (primary) or enveloping XAdES packaging.
+	Packaging Packaging
+	// Digest names the digest algorithm ("sha256" default; "sha1" reserved for
+	// the future authentication challenge case). It is driven by profile, never
+	// read from an untrusted request hint. See docs/ROADMAP.md.
+	Digest string
+	// HelperJar is the filesystem path to the EU DSS helper jar (dss-helper.jar)
+	// that the XAdES profile shells out to. Required for XAdES.
+	HelperJar string
 }
 
 // Result describes the outcome of a signing operation.

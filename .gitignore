@@ -8,6 +8,9 @@ moldsign2412unbundled/
 bin/
 dist/
 
+# Java DSS helper build outputs (the pom + sources are committed, not the jar)
+java/dss-helper/target/
+
 # Local command output
 inspect-out/
 sign-raw-out/

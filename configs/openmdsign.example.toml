@@ -28,4 +28,9 @@ module = ""
 # ocsp_url = ""
 
 # RFC 3161 timestamp authority URL.
-# tsa_url = ""
+# tsa_url = "http://tsp.pki.gov.md/moldsign2/"
+
+# Path to the EU DSS helper jar used by the XAdES profile (non-PDF inputs).
+# Build it with `mvn -q package` in java/dss-helper. Precedence:
+# --dss-helper > $OPENMDSIGN_DSS_HELPER > this field > java/dss-helper/target/dss-helper.jar
+# dss_helper_jar = "/absolute/path/to/dss-helper.jar"
