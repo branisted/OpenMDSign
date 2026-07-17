@@ -136,6 +136,18 @@ rather than reimplementing XAdES from scratch. The vendor stack already bundles
 IAIK XAdES/CMS/TSP jars, a strong hint the profile may be XAdES and/or CAdES.
 Record the actual profile in `docs/recon.md` once known.
 
+**RESOLVED by live capture (2026-07-18) — see `docs/PROTOCOL.md`.** A real
+authentication signature from `mpass.gov.md` was captured off the running Windows
+MoldSign Server. The XAdES is a **standalone `<ds:Signature>` `.xml`, NOT an
+ASiC-E zip** — so the ASiC-E packaging worry above does not apply. It is
+**XAdES-T** (embedded RFC 3161 `SignatureTimeStamp`, TSA `MDQTSA`), with
+`SigningCertificate` (v1), C14N `#WithComments`, and — notably —
+**`rsa-sha1` / `sha1`, not SHA-256** as the static analysis had guessed. The DSS
+delegation decision stands (still don't hand-roll C14N/XAdES in Go); the concrete
+target is now standalone XAdES-T, SHA-1, over a pre-hashed challenge. The
+`/sign/data` request's `algorithm` field is a page hint and must **not** drive the
+container digest (the same field said `SHA-1` on a PDF job that came out SHA-256).
+
 ## Phase 2a: PAdES-B-T PDF signer — library validation & decisions (2026-07-18)
 
 ### `github.com/digitorus/pdfsign` validation (Step-1 gate)

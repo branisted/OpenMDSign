@@ -15,3 +15,15 @@ sign-out/
 
 # Reference signature samples — contain personal cert data, never commit
 signed-samples/
+
+# Regenerable public CA chain (not bundled per no-STISC-certs policy)
+moldsign-chain.pem
+
+# Protocol-recon capture artifacts — embed a real qualified cert + personal data.
+# PROTOCOL.md is the sanitized deliverable; the raw captures never get committed.
+*.har
+*.saz
+*.rar
+moldsign-recon-*
+RESULT-*.bin
+test.pdf
