@@ -63,7 +63,15 @@ type serveFlags struct {
 	corsOrigin []string
 	module     string
 	devCertDir string
+	chain      string
+	dssHelper  string
+	tsaURL     string
+	fakeSigner bool
 }
+
+// defaultDSSHelperJar is the conventional build location of the EU DSS helper
+// jar, relative to the repo root (where `mvn package` writes it).
+const defaultDSSHelperJar = "java/dss-helper/target/dss-helper.jar"
 
 func newServeCmd(gf *globalFlags) *cobra.Command {
 	f := &serveFlags{}
@@ -85,9 +93,31 @@ func newServeCmd(gf *globalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&f.httpAddr, "http-addr", d.HTTPAddr, "optional plain-HTTP probe listen address (empty disables)")
 	cmd.Flags().StringVar(&f.hostname, "hostname", d.Hostname, "TLS server name the browser targets")
 	cmd.Flags().StringSliceVar(&f.corsOrigin, "cors-origin", d.CORSAllowlist, "strict CORS allowlist (repeatable)")
-	cmd.Flags().StringVar(&f.module, "module", "", "path to the vendor PKCS#11 module (.dylib) for /certificates")
+	cmd.Flags().StringVar(&f.module, "module", "", "path to the vendor PKCS#11 module (.dylib) for /certificates and signing (enables the real signer)")
 	cmd.Flags().StringVar(&f.devCertDir, "dev-cert-dir", d.DevCertDir, "directory to cache the self-signed dev cert (empty = in-memory)")
+	cmd.Flags().StringVar(&f.chain, "chain", "", "PEM bundle of the issuer chain (issuing CA + root) embedded in PAdES signatures")
+	cmd.Flags().StringVar(&f.dssHelper, "dss-helper", "", "path to the EU DSS helper jar (XAdES document signing). Default: "+defaultDSSHelperJar)
+	cmd.Flags().StringVar(&f.tsaURL, "tsa-url", "", "RFC 3161 TSA URL for -T signatures (default: the MoldSign TSA)")
+	// Dev/smoke aid: inject a canned signer that returns a fixed base64 without a
+	// token, PIN, or dialog. Hidden and OFF by default; never a production path.
+	cmd.Flags().BoolVar(&f.fakeSigner, "dev-fake-signer", false, "DEV ONLY: wire a canned fake signer (no token/PIN) for smoke testing")
+	_ = cmd.Flags().MarkHidden("dev-fake-signer")
 	return cmd
+}
+
+// cannedSigner is a hardware-free server.Signer for `--dev-fake-signer`: it
+// returns a fixed base64 payload so the 201 + Location + fetch flow can be
+// exercised over real HTTP without a token, PIN, or dialog. It is NEVER wired
+// unless the hidden dev flag is set.
+type cannedSigner struct{}
+
+func (cannedSigner) Sign(_ context.Context, req server.SignRequest) (server.SignResult, error) {
+	format := "pdf"
+	if req.SignFormat == "XAdES-T" {
+		format = "XAdES"
+	}
+	// "canned-signed-container" in base64.
+	return server.SignResult{Format: format, Base64File: "Y2FubmVkLXNpZ25lZC1jb250YWluZXI="}, nil
 }
 
 func runServe(cmd *cobra.Command, gf *globalFlags, f *serveFlags) error {
@@ -117,6 +147,40 @@ func runServe(cmd *cobra.Command, gf *globalFlags, f *serveFlags) error {
 	if cmd.Flags().Changed("module") {
 		modulePath = f.module
 	}
+	chainPEM := cfg.CAChain
+	if cmd.Flags().Changed("chain") {
+		chainPEM = f.chain
+	}
+	dssHelper := cfg.DSSHelperJar
+	if cmd.Flags().Changed("dss-helper") {
+		dssHelper = f.dssHelper
+	}
+	if dssHelper == "" {
+		dssHelper = defaultDSSHelperJar
+	}
+	tsaURL := cfg.TSAURL
+	if cmd.Flags().Changed("tsa-url") {
+		tsaURL = f.tsaURL
+	}
+
+	opts := []server.Option{server.WithLogger(slog.Default())}
+	// Signer selection precedence:
+	//   --dev-fake-signer → a canned, hardware-free signer (smoke testing only);
+	//   --module set      → the REAL TokenSigner (PAdES/XAdES + PIN/confirm gate);
+	//   neither           → the Phase B stub (501), keeping dev/tests hardware-free.
+	switch {
+	case f.fakeSigner:
+		slog.Default().Warn("DEV: wiring the canned fake signer (--dev-fake-signer); no token, PIN, or dialog is used")
+		opts = append(opts, server.WithSigner(cannedSigner{}))
+	case modulePath != "":
+		signer := server.NewTokenSigner(server.TokenSignerConfig{
+			ModulePath:   modulePath,
+			ChainPEM:     chainPEM,
+			DSSHelperJar: dssHelper,
+			TSAURL:       tsaURL,
+		}, server.NewOSAScriptConfirmer(), slog.Default())
+		opts = append(opts, server.WithSigner(signer))
+	}
 
 	srv := server.New(server.Config{
 		HTTPSAddr:     dc.HTTPSAddr,
@@ -125,7 +189,7 @@ func runServe(cmd *cobra.Command, gf *globalFlags, f *serveFlags) error {
 		CORSAllowlist: dc.CORSAllowlist,
 		ModulePath:    modulePath,
 		DevCertDir:    dc.DevCertDir,
-	}, server.WithLogger(slog.Default()))
+	}, opts...)
 
 	// Cancel on SIGINT/SIGTERM for a graceful shutdown.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

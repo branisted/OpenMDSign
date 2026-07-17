@@ -25,6 +25,10 @@ var ErrSignerNotImplemented = errors.New("openmdsignd: signing not implemented i
 //   - ContentType ("Pdf" | "Text") distinguishes a full document from a
 //     pre-hashed challenge.
 //   - Data is the decoded base64 payload (full PDF or pre-hashed challenge).
+//   - Origin is the requesting site's Origin header (e.g. https://msign.gov.md),
+//     threaded from the handler so the per-operation confirmation dialog can name
+//     WHO is asking to sign. It is the anti-oracle protection alongside the CORS
+//     allowlist: the user consciously authorizes THIS site's THIS operation.
 type SignRequest struct {
 	Algorithm     string
 	Certificate   json.RawMessage
@@ -32,6 +36,7 @@ type SignRequest struct {
 	SignFormat    string
 	ContentType   string
 	Data          []byte
+	Origin        string
 }
 
 // SignResult is what a Phase C Signer produces: the finished container plus the

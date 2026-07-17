@@ -228,6 +228,9 @@ func (s *Server) handleSign(w http.ResponseWriter, r *http.Request) {
 		SignFormat:    body.SignFormat,
 		ContentType:   body.ContentType,
 		Data:          data,
+		// Origin names the requesting site to the per-operation confirmation
+		// dialog (§7). Empty when the caller sent no Origin header.
+		Origin: r.Header.Get("Origin"),
 	}
 
 	// ── Phase C seam ─────────────────────────────────────────────────────────
@@ -236,13 +239,27 @@ func (s *Server) handleSign(w http.ResponseWriter, r *http.Request) {
 	// finished container. Phase B's stub returns ErrSignerNotImplemented ⇒ 501.
 	res, err := s.signer.Sign(r.Context(), req)
 	if err != nil {
-		if errors.Is(err, ErrSignerNotImplemented) {
+		switch {
+		case errors.Is(err, ErrSignerNotImplemented):
 			s.writeError(w, http.StatusNotImplemented,
 				"signing not yet implemented (Daemon Phase C); request parsed and validated OK")
-			return
+		case errors.Is(err, ErrAuthChallengeNotWired):
+			// The mpass auth-challenge XAdES path (SHA-1 over a pre-hash) is
+			// recognized but deliberately not wired (unverified). 501, not 500.
+			s.writeError(w, http.StatusNotImplemented, err.Error())
+		case errors.Is(err, ErrUserCancelled):
+			// The user declined the per-operation confirmation dialog (§7). No
+			// token access occurred. The exact vendor error shape for a cancel
+			// is unconfirmed (PROTOCOL.md §8.3); we answer 403 with a small body.
+			s.writeError(w, http.StatusForbidden, "signing cancelled by user")
+		case errors.Is(err, ErrUnsupportedSignFormat):
+			s.writeError(w, http.StatusBadRequest, err.Error())
+		default:
+			// Never surface the raw error to the client (may name internals); log
+			// it (never a PIN — the Signer guarantees none reaches an error).
+			s.log.Warn("sign failed", "err", err.Error(), "signFormat", body.SignFormat)
+			s.writeError(w, http.StatusInternalServerError, "signing failed")
 		}
-		s.log.Warn("sign failed", "err", err.Error(), "signFormat", body.SignFormat)
-		s.writeError(w, http.StatusInternalServerError, "signing failed")
 		return
 	}
 
