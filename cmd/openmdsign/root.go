@@ -22,7 +22,9 @@ func newRootCmd() *cobra.Command {
 		Long: "openmdsign is an open-source macOS CLI for signing files with a hardware\n" +
 			"PKCS#11 token. It is unofficial, not affiliated with any authority, and does\n" +
 			"not claim to produce a legally \"qualified\" signature.\n\n" +
-			"Phase 0 provides the read-only `inspect` recon command.",
+			"Commands:\n" +
+			"  inspect   read-only recon of a PKCS#11 token.\n" +
+			"  sign-raw  crypto proof-of-life: sign a file's SHA-256 digest and verify.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -41,5 +43,6 @@ func newRootCmd() *cobra.Command {
 	}
 
 	root.AddCommand(newInspectCmd(gf))
+	root.AddCommand(newSignRawCmd(gf))
 	return root
 }

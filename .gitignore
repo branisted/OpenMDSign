@@ -8,5 +8,6 @@ moldsign2412unbundled/
 bin/
 dist/
 
-# Local inspect output
+# Local command output
 inspect-out/
+sign-raw-out/

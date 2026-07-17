@@ -50,14 +50,20 @@ func newInspectCmd(gf *globalFlags) *cobra.Command {
 	return cmd
 }
 
-// resolvedConfig applies precedence flags > config file > defaults.
-func resolveConfig(cmd *cobra.Command, gf *globalFlags, f *inspectFlags) (config.Config, error) {
+// loadConfig reads the config file honoring --config precedence (a default
+// ./openmdsign.toml is used when present). It applies no flag overrides.
+func loadConfig(cmd *cobra.Command, gf *globalFlags) (config.Config, error) {
 	path := gf.configPath
 	required := path != ""
 	if path == "" && config.FileExists("openmdsign.toml") {
 		path = "openmdsign.toml"
 	}
-	cfg, err := config.LoadFile(path, required)
+	return config.LoadFile(path, required)
+}
+
+// resolveConfig applies precedence flags > config file > defaults.
+func resolveConfig(cmd *cobra.Command, gf *globalFlags, f *inspectFlags) (config.Config, error) {
+	cfg, err := loadConfig(cmd, gf)
 	if err != nil {
 		return cfg, err
 	}
@@ -84,7 +90,7 @@ func runInspect(cmd *cobra.Command, gf *globalFlags, f *inspectFlags) error {
 	}
 
 	// Resolve the PIN (never logged). --pin-stdin takes precedence.
-	pin, hasPIN, err := resolvePIN(cmd, f)
+	pin, hasPIN, err := resolvePIN(cmd, f.pin, f.pinStdin)
 	if err != nil {
 		return err
 	}
@@ -144,8 +150,10 @@ type silentError struct{}
 
 func (*silentError) Error() string { return "" }
 
-func resolvePIN(cmd *cobra.Command, f *inspectFlags) (string, bool, error) {
-	if f.pinStdin {
+// resolvePIN resolves the user PIN from --pin-stdin (preferred) or --pin. The
+// PIN is never logged. A returned hasPIN=false means no PIN was supplied.
+func resolvePIN(cmd *cobra.Command, pin string, pinStdin bool) (string, bool, error) {
+	if pinStdin {
 		r := bufio.NewReader(os.Stdin)
 		line, err := r.ReadString('\n')
 		line = strings.TrimRight(line, "\r\n")
@@ -158,10 +166,10 @@ func resolvePIN(cmd *cobra.Command, f *inspectFlags) (string, bool, error) {
 		return line, true, nil
 	}
 	if cmd.Flags().Changed("pin") {
-		if f.pin == "" {
+		if pin == "" {
 			return "", false, fmt.Errorf("--pin was empty")
 		}
-		return f.pin, true, nil
+		return pin, true, nil
 	}
 	return "", false, nil
 }
