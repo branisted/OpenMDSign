@@ -117,4 +117,12 @@ WithComments quirk), digest over raw bytes (simplest, most robust), and -T carri
 trusted time. BES is a stepping stone; -C only if a consumer demands the legacy
 references form.
 
+### TSA verification (2026-07-18)
+
+The TSA `http://tsp.pki.gov.md/moldsign2/` was probed with a standard RFC 3161
+SHA-256 query (`openssl ts -query`): **HTTP 200, `Status: Granted`**,
+`application/timestamp-reply`, signed by **`CN=MDQTSA`**, policy OID
+`1.2.498.3.32.5`, accuracy 60s. **Unauthenticated, plain HTTP** — no credentials
+needed for the `-T` path at runtime.
+
 **Acceptance for every target:** round-trips as VALID through semnatura.md.
