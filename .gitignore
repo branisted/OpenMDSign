@@ -11,3 +11,6 @@ dist/
 # Local command output
 inspect-out/
 sign-raw-out/
+
+# Reference signature samples — contain personal cert data, never commit
+signed-samples/
