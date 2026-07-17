@@ -315,7 +315,7 @@ func TestSignResultMissingJob404(t *testing.T) {
 // --- dev cert ---------------------------------------------------------------
 
 func TestDevCertGeneratesForHostname(t *testing.T) {
-	cert, err := DevCert("localhost.cts.md", "")
+	cert, err := DevCert("localhost.cts.md")
 	if err != nil {
 		t.Fatalf("DevCert: %v", err)
 	}

@@ -32,7 +32,8 @@ func newRootCmd() *cobra.Command {
 			"enumeration SKELETON. It does NOT sign yet — POST /sign/data returns 501 until\n" +
 			"Phase C wires the signers. It is unofficial and makes no \"qualified\" claim.\n\n" +
 			"Commands:\n" +
-			"  serve   run the loopback HTTPS daemon.",
+			"  serve   run the loopback HTTPS daemon.\n" +
+			"  trust   manage OS trust for the per-machine serving cert (Daemon Phase D).",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -51,6 +52,7 @@ func newRootCmd() *cobra.Command {
 	}
 
 	root.AddCommand(newServeCmd(gf))
+	root.AddCommand(newTrustCmd(gf))
 	return root
 }
 
@@ -62,7 +64,8 @@ type serveFlags struct {
 	hostname   string
 	corsOrigin []string
 	module     string
-	devCertDir string
+	tlsDir     string
+	devCert    bool
 	chain      string
 	dssHelper  string
 	tsaURL     string
@@ -81,9 +84,11 @@ func newServeCmd(gf *globalFlags) *cobra.Command {
 		Long: "serve binds the loopback HTTPS listener (default 127.0.0.1:18443 for host\n" +
 			"localhost.cts.md) and answers the three PROTOCOL.md routes: GET /certificates,\n" +
 			"POST /sign/data (501 until Phase C), and GET /sign/data/PKCS11/{uuid}/{format}.\n\n" +
-			"TLS uses a SELF-SIGNED dev certificate (Phase B). The real publicly-trusted-cert\n" +
-			"trust gate is Daemon Phase D. localhost.cts.md must resolve to 127.0.0.1 (public\n" +
-			"DNS provides it; a hosts entry is a fallback).",
+			"TLS uses a PERSISTENT per-machine self-signed leaf for localhost.cts.md (Daemon\n" +
+			"Phase D), generated on first run under ~/Library/Application Support/openmdsign/tls.\n" +
+			"Run 'openmdsignd trust install' once to add it to your login keychain as a trusted\n" +
+			"SSL anchor. localhost.cts.md must resolve to 127.0.0.1 (public DNS provides it; a\n" +
+			"hosts entry is an offline fallback). --dev-cert serves an ephemeral untrusted cert.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runServe(cmd, gf, f)
 		},
@@ -94,7 +99,8 @@ func newServeCmd(gf *globalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&f.hostname, "hostname", d.Hostname, "TLS server name the browser targets")
 	cmd.Flags().StringSliceVar(&f.corsOrigin, "cors-origin", d.CORSAllowlist, "strict CORS allowlist (repeatable)")
 	cmd.Flags().StringVar(&f.module, "module", "", "path to the vendor PKCS#11 module (.dylib) for /certificates and signing (enables the real signer)")
-	cmd.Flags().StringVar(&f.devCertDir, "dev-cert-dir", d.DevCertDir, "directory to cache the self-signed dev cert (empty = in-memory)")
+	cmd.Flags().StringVar(&f.tlsDir, "tls-dir", d.TLSDir, "directory for the persistent per-machine serving cert+key (empty = default ~/Library/Application Support/openmdsign/tls)")
+	cmd.Flags().BoolVar(&f.devCert, "dev-cert", false, "serve an EPHEMERAL in-memory self-signed cert instead of the persistent one (untrusted; dev/tests only)")
 	cmd.Flags().StringVar(&f.chain, "chain", "", "PEM bundle of the issuer chain (issuing CA + root) embedded in PAdES signatures")
 	cmd.Flags().StringVar(&f.dssHelper, "dss-helper", "", "path to the EU DSS helper jar (XAdES document signing). Default: "+defaultDSSHelperJar)
 	cmd.Flags().StringVar(&f.tsaURL, "tsa-url", "", "RFC 3161 TSA URL for -T signatures (default: the MoldSign TSA)")
@@ -140,8 +146,8 @@ func runServe(cmd *cobra.Command, gf *globalFlags, f *serveFlags) error {
 	if cmd.Flags().Changed("cors-origin") {
 		dc.CORSAllowlist = f.corsOrigin
 	}
-	if cmd.Flags().Changed("dev-cert-dir") {
-		dc.DevCertDir = f.devCertDir
+	if cmd.Flags().Changed("tls-dir") {
+		dc.TLSDir = f.tlsDir
 	}
 	modulePath := cfg.Module
 	if cmd.Flags().Changed("module") {
@@ -183,12 +189,13 @@ func runServe(cmd *cobra.Command, gf *globalFlags, f *serveFlags) error {
 	}
 
 	srv := server.New(server.Config{
-		HTTPSAddr:     dc.HTTPSAddr,
-		HTTPAddr:      dc.HTTPAddr,
-		Hostname:      dc.Hostname,
-		CORSAllowlist: dc.CORSAllowlist,
-		ModulePath:    modulePath,
-		DevCertDir:    dc.DevCertDir,
+		HTTPSAddr:        dc.HTTPSAddr,
+		HTTPAddr:         dc.HTTPAddr,
+		Hostname:         dc.Hostname,
+		CORSAllowlist:    dc.CORSAllowlist,
+		ModulePath:       modulePath,
+		TLSDir:           dc.TLSDir,
+		EphemeralDevCert: f.devCert,
 	}, opts...)
 
 	// Cancel on SIGINT/SIGTERM for a graceful shutdown.

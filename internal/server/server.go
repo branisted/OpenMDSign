@@ -39,8 +39,13 @@ type Config struct {
 	// ModulePath is the vendor PKCS#11 module path used by the token-backed
 	// CertProvider when one is not injected.
 	ModulePath string
-	// DevCertDir caches the self-signed dev cert; empty keeps it in-memory.
-	DevCertDir string
+	// TLSDir is the directory holding the persistent per-machine serving cert+key
+	// (Daemon Phase D). Empty falls back to DefaultTLSDir at serve time.
+	TLSDir string
+	// EphemeralDevCert, when true, serves the in-memory ephemeral dev cert
+	// (DevCert) instead of the persistent serving cert — a dev/test fallback
+	// (`serve --dev-cert`) that installs no trust anchor.
+	EphemeralDevCert bool
 }
 
 // Server is the daemon's HTTP surface. Construct with New; run with the

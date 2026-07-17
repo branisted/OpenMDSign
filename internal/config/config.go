@@ -71,11 +71,13 @@ type DaemonConfig struct {
 	// receives NO ACAO header. Never reflect-any.
 	CORSAllowlist []string `toml:"cors_allowlist"`
 
-	// DevCertDir, when non-empty, is where the self-signed dev cert+key for
-	// Hostname are cached (dev-cert.pem / dev-key.pem). Empty keeps them
-	// in-memory only. The real publicly-trusted-cert trust gate is Daemon
-	// Phase D — this dev cert is a stand-in and installs no trust anchor.
-	DevCertDir string `toml:"dev_cert_dir"`
+	// TLSDir overrides the directory holding the persistent per-machine serving
+	// cert+key (serving-cert.pem / serving-key.pem) for Hostname. Empty uses the
+	// default per-user location (~/Library/Application Support/openmdsign/tls on
+	// macOS). Daemon Phase D: the `openmdsignd trust install` command adds this
+	// self-signed leaf to the login keychain as a trusted SSL anchor
+	// (docs/PROTOCOL.md §2).
+	TLSDir string `toml:"tls_dir"`
 }
 
 // Default returns the built-in defaults (all zero/empty except Daemon, which
@@ -91,7 +93,7 @@ func DefaultDaemon() DaemonConfig {
 		HTTPAddr:      "", // plain-HTTP probe listener disabled unless configured
 		Hostname:      "localhost.cts.md",
 		CORSAllowlist: []string{"https://msign.gov.md", "https://mpass.gov.md"},
-		DevCertDir:    "",
+		TLSDir:        "",
 	}
 }
 
