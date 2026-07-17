@@ -8,6 +8,8 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+
+	"github.com/branistedev/openmdsign/internal/token"
 	"math/big"
 	"testing"
 	"time"
@@ -29,7 +31,7 @@ func TestBuildSHA256DigestInfoRoundTrip(t *testing.T) {
 	digest := sha256.Sum256(msg)
 
 	// The bytes we would hand to the token for CKM_RSA_PKCS.
-	di := buildSHA256DigestInfo(digest[:])
+	di := token.DigestInfoSHA256(digest[:])
 
 	// Emulate the token's raw RSASSA over the DigestInfo. crypto.Hash(0) means
 	// "the input is already the DigestInfo; do not prepend a prefix".
@@ -57,7 +59,7 @@ func TestBuildSHA256DigestInfoRoundTrip(t *testing.T) {
 // TestBuildSHA256DigestInfoPrefix pins the exact DigestInfo prefix bytes.
 func TestBuildSHA256DigestInfoPrefix(t *testing.T) {
 	digest := make([]byte, 32)
-	di := buildSHA256DigestInfo(digest)
+	di := token.DigestInfoSHA256(digest)
 	if len(di) != 19+32 {
 		t.Fatalf("DigestInfo length = %d, want %d", len(di), 19+32)
 	}

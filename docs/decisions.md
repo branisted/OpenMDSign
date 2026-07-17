@@ -135,3 +135,77 @@ the mature **EU DSS** library (Java, `eu.europa.esig.dss`) or an equivalent,
 rather than reimplementing XAdES from scratch. The vendor stack already bundles
 IAIK XAdES/CMS/TSP jars, a strong hint the profile may be XAdES and/or CAdES.
 Record the actual profile in `docs/recon.md` once known.
+
+## Phase 2a: PAdES-B-T PDF signer — library validation & decisions (2026-07-18)
+
+### `github.com/digitorus/pdfsign` validation (Step-1 gate)
+
+Inspected the actually-installed source, not memory
+(`pdfsign@v0.0.0-20260407063256-85ede6424a74`, dependency
+`pkcs7@v0.0.0-20230818184609`, `timestamp@v0.0.0-20250524132541`).
+
+**Maintenance:** healthy — the pinned `pdfsign` revision is from **April 2026**;
+`timestamp` from **May 2025**. Pure Go, no JVM, MIT/BSD-licensed.
+
+**Capability checklist (resolved API used):**
+
+| Capability | Verdict | Resolved API |
+|---|---|---|
+| External `crypto.Signer` (token signs; no raw key) | **YES** | `sign.SignData.Signer crypto.Signer`, driven via `pkcs7.AddSignerChain`; `signAttributes` calls `signer.Sign(rand, SHA256(signedAttrs), crypto.SHA256)` |
+| ESS `signingCertificateV2` (OID …16.2.47) | **YES** | `createSigningCertificateAttribute()` emits it for SHA-256 |
+| RFC 3161 timestamp via configurable TSA | **YES** | `SignData.TSA.URL`; token embedded as unsigned attr OID …16.2.14 |
+| SHA-256 / sha256WithRSAEncryption | **YES** | `SignData.DigestAlgorithm = crypto.SHA256` |
+| `/SubFilter /ETSI.CAdES.detached` | **NO (hardcoded)** | upstream hardcodes `/adbe.pkcs7.detached` in `pdfsignature.go`; no config knob |
+| Signed attrs == exactly {contentType, messageDigest, signingCertificateV2} | **NO** | upstream always injects legacy Adobe `adbe-revocationInfoArchival` (OID 1.2.840.113583.1.1.8), empty when no revocation |
+| LTV `/DSS` document security store | **NO** | not implemented by pdfsign (it does the legacy CMS revocation attr, not the ETSI PDF-level `/DSS`) |
+
+**Decision (STOP-flag resolved by minimal fork, not a non-conforming ship):**
+Two of the required properties are not reachable through upstream configuration,
+so per the Step-1 gate we did **not** ship a non-conforming signature. We took
+the sanctioned *fork/patch* option: the `sign` subpackage is vendored verbatim
+into `internal/pades/pdfsign/` (BSD-2-Clause `LICENSE` + `NOTICE.md` retained)
+with exactly two patches, both marked `openmdsign FORK PATCH`:
+
+1. `/SubFilter /adbe.pkcs7.detached` → `/ETSI.CAdES.detached`. The two names are
+   both **19 bytes**, so the signed `/ByteRange` offsets are byte-identical; only
+   the SubFilter name changes. (Post-processing the output was rejected because
+   the SubFilter lives *inside* the signed ByteRange.)
+2. Drop the always-injected `adbe-revocationInfoArchival` signed attribute, so the
+   SignerInfo carries exactly contentType + messageDigest + signingCertificateV2.
+
+All other upstream deps (`pkcs7`, `pdf`, `timestamp`, `revocation`, `verify`,
+`filebuffer`, `x/crypto`, `x/text`) remain external module dependencies. To
+re-sync with upstream: re-copy `sign/*.go`, re-apply the package rename and the
+two `FORK PATCH` edits.
+
+**`/DSS`-LTV: DEFERRED.** pdfsign cannot emit an ETSI `/DSS` store and the profile
+lists it as best-effort. The signature is PAdES-**B-T** (timestamp inside the CMS),
+not B-LT/B-LTA. Revisit if semnatura.md requires LTV material for acceptance.
+
+### Token as `crypto.Signer` — `internal/token.Signer`
+
+We did **not** adopt `crypto11`. Instead a thin `crypto.Signer` adapter sits over
+the existing `internal/token` layer (`OpenSigner` / `Signer`):
+
+- The `sign` command opens the module, and `(*Ctx).OpenSigner` opens a session and
+  performs **exactly one** `C_Login` (same typed `*LoginError` path as `sign-raw`;
+  on failure it aborts with the lockout warning, **no retry**), then locates the
+  key + certificate by CKA_ID (or auto-selects the single CKA_SIGN key). The PIN
+  is dropped the instant login returns and is never stored on the Signer.
+- `Public()` returns the certificate's public key; `Certificate()` the leaf.
+- `Sign(rand, digest, opts)` requires SHA-256, builds the PKCS#1 v1.5 DigestInfo
+  via the shared `token.DigestInfoSHA256` (factored out of `sign_raw.go`), and
+  raw-signs it with `CKM_RSA_PKCS`, returning a standard RSASSA-PKCS1-v1_5
+  signature — exactly what `pkcs7.signAttributes` expects.
+- The login/session lifetime spans the whole sign; the command defers
+  `signer.Close()` (C_Logout + CloseSession). The Signer itself NEVER logs in.
+
+### `sign` command & pluggable profile
+
+`internal/sign` was reshaped around an already-authenticated `crypto.Signer`
+(login stays with the caller). `internal/sign/pades` implements the `Signer`
+interface for PDFs; the profile is selected by extension (`auto`) or `--profile`,
+with a clear "XAdES not yet implemented — Phase 2b" error for non-PDF input so
+XAdES can slot in later. Privacy: the PIN never reaches a log; only the input
+basename (never a local absolute path) is used, and it is not written into
+signature metadata.
