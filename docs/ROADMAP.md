@@ -26,8 +26,8 @@ is not a separate project — it is a second consumer of the core.
 |---|---|---|
 | Core/CLI | P0 `inspect` recon | ✅ done, hardware-validated |
 | Core/CLI | P1 `sign-raw` proof-of-life | ✅ done, hardware-validated |
-| Core/CLI | **P2a PAdES-B-T signer** | ✅ **done — semnatura.md returns VALID** |
-| Core/CLI | P2b XAdES-T signer (EU DSS) | ✅ **done — builds; sw-key integration PASS; awaiting real-token semnatura.md check** |
+| Core/CLI | **P2a PAdES-B-T signer** | ✅ **done — VALID via msign.gov.md/#/verify/upload** |
+| Core/CLI | P2b XAdES-T signer (EU DSS) | ✅ **done — VALID in MoldSign app (detached, XAdES-T, cert+TSA+timestamp shown)** |
 | Core/CLI | P3 `verify` + trust anchors | ▫ todo |
 | Core/CLI | P4 LTV / XAdES-C, `/DSS` store | ▫ todo (optional) |
 | Core/CLI | P5 packaging (brew, notarized dmg) | ▫ todo |
@@ -85,6 +85,14 @@ SHA-1 on a PDF job that emitted SHA-256). Drive digest from `signFormat` + profi
 - `docs/PROTOCOL.md` — the localhost browser⇄daemon REST contract.
 - `docs/decisions.md` — architecture & library decisions with rationale.
 - `docs/recon.md` — token/PKCS#11 recon + reference-capture procedure.
+
+## Where signatures get validated (acceptance surfaces)
+- **PAdES / PDF** → `https://msign.gov.md/#/verify/upload` (PDF-only web verifier).
+- **XAdES / XML** → the **MoldSign desktop app** validation feature. It keys off the
+  **`.xades` extension** (a `.xml` suffix is rejected); for **detached**, the original
+  document must sit next to the `.xades` file so the `file:/<name>` reference resolves.
+- `https://semnatura.md/certificate/verify` → only checks **certificate status** by
+  IDNP/serial; it does **not** validate signature files.
 
 ## Non-negotiables (both tracks)
 - PKCS#11 PIN: **exactly one** `C_Login`, never retried; never logged/serialized.
