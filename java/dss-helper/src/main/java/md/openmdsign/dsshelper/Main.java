@@ -20,6 +20,7 @@ import eu.europa.esig.dss.service.http.commons.TimestampDataLoader;
 import eu.europa.esig.dss.service.tsp.OnlineTSPSource;
 import eu.europa.esig.dss.spi.validation.CertificateVerifier;
 import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
+import eu.europa.esig.dss.spi.x509.CommonTrustedCertificateSource;
 import eu.europa.esig.dss.validation.SignedDocumentValidator;
 import eu.europa.esig.dss.validation.reports.Reports;
 import eu.europa.esig.dss.simplereport.SimpleReport;
@@ -198,7 +199,38 @@ public final class Main {
         byte[] xml = Base64.getDecoder().decode(reqText(req, "xmlB64"));
         DSSDocument doc = new InMemoryDocument(xml, "signature.xml");
         SignedDocumentValidator v = SignedDocumentValidator.fromDocument(doc);
-        v.setCertificateVerifier(new CommonCertificateVerifier());
+
+        // Seed the CertificateVerifier with the caller-supplied trust anchors
+        // (the public STISC CA certs). Without a trusted source DSS returns
+        // NO_CERTIFICATE_CHAIN_FOUND; with it, the chain terminates at a real
+        // anchor and DSS emits a genuine indication.
+        CommonCertificateVerifier cv = new CommonCertificateVerifier();
+        JsonNode anchors = req.get("anchorsB64");
+        if (anchors != null && anchors.isArray() && anchors.size() > 0) {
+            CommonTrustedCertificateSource trusted = new CommonTrustedCertificateSource();
+            for (JsonNode a : anchors) {
+                trusted.addCertificate(new CertificateToken(parseCert(a.asText())));
+            }
+            cv.setTrustedCertSources(trusted);
+        }
+
+        // Revocation: offline by default (no source => at worst an
+        // INDETERMINATE/NO_REVOCATION_DATA subindication, never a hard failure).
+        // With checkRevocation, wire online OCSP + CRL and let DSS fetch AIA.
+        boolean checkRevocation = req.has("checkRevocation") && req.get("checkRevocation").asBoolean();
+        if (checkRevocation) {
+            eu.europa.esig.dss.service.ocsp.OnlineOCSPSource ocsp =
+                    new eu.europa.esig.dss.service.ocsp.OnlineOCSPSource();
+            ocsp.setDataLoader(new eu.europa.esig.dss.service.http.commons.OCSPDataLoader());
+            eu.europa.esig.dss.service.crl.OnlineCRLSource crl =
+                    new eu.europa.esig.dss.service.crl.OnlineCRLSource();
+            crl.setDataLoader(new eu.europa.esig.dss.service.http.commons.CommonsDataLoader());
+            cv.setOcspSource(ocsp);
+            cv.setCrlSource(crl);
+            cv.setAIASource(new eu.europa.esig.dss.spi.x509.aia.DefaultAIASource());
+            cv.setCheckRevocationForUntrustedChains(true);
+        }
+        v.setCertificateVerifier(cv);
 
         if (req.hasNonNull("detachedFileB64")) {
             byte[] f = Base64.getDecoder().decode(req.get("detachedFileB64").asText());
@@ -209,6 +241,9 @@ public final class Main {
         }
 
         Reports reports = v.validateDocument();
+        if (System.getenv("OPENMDSIGN_DSS_DEBUG") != null) {
+            System.err.println(reports.getXmlDetailedReport());
+        }
         SimpleReport sr = reports.getSimpleReport();
         String sigId = sr.getFirstSignatureId();
         resp.put("ok", true);
@@ -217,6 +252,22 @@ public final class Main {
         SubIndication sub = sigId == null ? null : sr.getSubIndication(sigId);
         resp.put("indication", ind == null ? null : ind.name());
         resp.put("subIndication", sub == null ? null : sub.name());
+
+        if (sigId != null) {
+            resp.put("signedBy", sr.getSignedBy(sigId));
+            Date signingTime = sr.getSigningTime(sigId);
+            if (signingTime != null) {
+                resp.put("signingTime", signingTime.toInstant().toString());
+            }
+            List<eu.europa.esig.dss.simplereport.jaxb.XmlTimestamp> tss = sr.getSignatureTimestamps(sigId);
+            if (tss != null && !tss.isEmpty()) {
+                eu.europa.esig.dss.simplereport.jaxb.XmlTimestamp t = tss.get(0);
+                if (t.getProductionTime() != null) {
+                    resp.put("timestampTime", t.getProductionTime().toInstant().toString());
+                }
+                resp.put("timestampProducedBy", t.getProducedBy());
+            }
+        }
     }
 
     // ---- helpers ----

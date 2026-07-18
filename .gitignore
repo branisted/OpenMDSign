@@ -36,6 +36,8 @@ moldsign-chain.pem
 moldsign-recon-*
 RESULT-*.bin
 test.pdf
+# Detached-original fixture for XAdES verify integration tests (not committed).
+test.txt
 
 # Agent worktrees (transient)
 .claude/worktrees/

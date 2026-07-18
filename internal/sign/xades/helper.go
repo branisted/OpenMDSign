@@ -55,6 +55,11 @@ type resp struct {
 	Indication    string `json:"indication"`
 	SubIndication string `json:"subIndication"`
 	SignatureID   string `json:"signatureId"`
+	// validate-only enrichment fields (from the DSS simple report).
+	SignedBy            string `json:"signedBy"`
+	SigningTime         string `json:"signingTime"`
+	TimestampTime       string `json:"timestampTime"`
+	TimestampProducedBy string `json:"timestampProducedBy"`
 }
 
 // startHelper spawns the DSS helper jar. javaPath may be empty (resolved from

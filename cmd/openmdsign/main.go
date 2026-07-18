@@ -11,12 +11,21 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
+		// exitError carries an explicit exit code (e.g. from `verify`).
+		var ee *exitError
+		if errors.As(err, &ee) {
+			if ee.msg != "" {
+				fmt.Fprintln(os.Stderr, "Error: "+ee.msg)
+			}
+			os.Exit(ee.code)
+		}
 		// errSilent means a detailed diagnostic was already written to stderr.
 		if msg := err.Error(); msg != "" {
 			fmt.Fprintln(os.Stderr, "Error: "+msg)

@@ -25,7 +25,8 @@ func newRootCmd() *cobra.Command {
 			"Commands:\n" +
 			"  inspect   read-only recon of a PKCS#11 token.\n" +
 			"  sign-raw  crypto proof-of-life: sign a file's SHA-256 digest and verify.\n" +
-			"  sign      produce an AdES signature (PAdES-B-T for PDF).",
+			"  sign      produce an AdES signature (PAdES-B-T for PDF).\n" +
+			"  verify    verify a PAdES/XAdES signature against the STISC trust anchors.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -46,5 +47,6 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newInspectCmd(gf))
 	root.AddCommand(newSignRawCmd(gf))
 	root.AddCommand(newSignCmd(gf))
+	root.AddCommand(newVerifyCmd(gf))
 	return root
 }
