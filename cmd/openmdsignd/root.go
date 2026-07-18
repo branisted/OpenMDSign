@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -28,12 +29,13 @@ func newRootCmd() *cobra.Command {
 		Long: "openmdsignd is the local HTTPS daemon half of openmdsign. It answers the\n" +
 			"browser⇄daemon localhost REST contract (docs/PROTOCOL.md) so the Moldovan\n" +
 			"e-signature web front-ends can enumerate and drive a hardware PKCS#11 token.\n\n" +
-			"This is Daemon Phase B: the transport, routing, CORS allowlist and certificate\n" +
-			"enumeration SKELETON. It does NOT sign yet — POST /sign/data returns 501 until\n" +
-			"Phase C wires the signers. It is unofficial and makes no \"qualified\" claim.\n\n" +
+			"With --module set it signs: POST /sign/data produces a PAdES-T (PDF) or\n" +
+			"XAdES-T (document, or the mpass SHA-1 login challenge) container, gated by a\n" +
+			"native per-operation PIN + confirmation dialog. It is unofficial and makes no\n" +
+			"\"qualified\" claim.\n\n" +
 			"Commands:\n" +
 			"  serve   run the loopback HTTPS daemon.\n" +
-			"  trust   manage OS trust for the per-machine serving cert (Daemon Phase D).",
+			"  trust   manage OS trust for the per-machine serving cert.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -127,6 +129,11 @@ func (cannedSigner) Sign(_ context.Context, req server.SignRequest) (server.Sign
 }
 
 func runServe(cmd *cobra.Command, gf *globalFlags, f *serveFlags) error {
+	// Log the build revision up front so a stale binary is obvious (the mpass
+	// auth path and the request logging only exist in recent builds). Go embeds
+	// the VCS revision automatically for `go build` inside a git repo.
+	slog.Default().Info("openmdsignd build", "revision", buildRevision())
+
 	cfg, err := loadConfig(gf)
 	if err != nil {
 		return err
@@ -202,6 +209,32 @@ func runServe(cmd *cobra.Command, gf *globalFlags, f *serveFlags) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return srv.Run(ctx)
+}
+
+// buildRevision returns the embedded VCS revision (short) and a dirty flag, or
+// "unknown" when build info is unavailable. Used only for the startup log so a
+// stale binary is easy to spot.
+func buildRevision() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	rev, dirty := "unknown", ""
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			if len(s.Value) >= 12 {
+				rev = s.Value[:12]
+			} else if s.Value != "" {
+				rev = s.Value
+			}
+		case "vcs.modified":
+			if s.Value == "true" {
+				dirty = "-dirty"
+			}
+		}
+	}
+	return rev + dirty
 }
 
 // loadConfig reads the config honoring --config precedence (a default
