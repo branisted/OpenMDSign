@@ -21,7 +21,8 @@ import (
 // NEVER retries a login -- that policy is owned entirely by the caller.
 //
 // Sign performs a raw CKM_RSA_PKCS operation over the PKCS#1 v1.5 DigestInfo
-// (built by DigestInfoSHA256), returning a standard RSASSA-PKCS1-v1_5 signature.
+// (SHA-256 by default; SHA-1 for the mpass auth challenge), returning a standard
+// RSASSA-PKCS1-v1_5 signature.
 type Signer struct {
 	ctx      *Ctx
 	sess     pkcs11.SessionHandle
@@ -122,23 +123,41 @@ func (s *Signer) SlotID() uint { return s.slotID }
 func (s *Signer) TokenLabel() string { return s.label }
 
 // Sign performs a raw RSASSA-PKCS1-v1_5 signature over digest using the on-token
-// key. digest must be a 32-byte SHA-256 digest and opts.HashFunc() must be
-// crypto.SHA256 -- the only hash the profile uses. It builds the PKCS#1 v1.5
-// DigestInfo (DigestInfoSHA256) and signs it raw with CKM_RSA_PKCS, so the
-// result is a standard RSASSA-PKCS1-v1_5 signature verifiable with
-// rsa.VerifyPKCS1v15. rand is ignored (RSA PKCS#1 v1.5 is deterministic).
+// key. opts.HashFunc() selects the DigestInfo prefix:
+//
+//   - crypto.SHA256 (document PAdES/XAdES) — the general default.
+//   - crypto.SHA1   (mpass authentication challenge ONLY) — mandated by the
+//     government auth protocol for interop (PROTOCOL.md §5/§6); never used for
+//     document signing.
+//
+// It builds the matching PKCS#1 v1.5 DigestInfo and signs it raw with
+// CKM_RSA_PKCS, so the result is a standard RSASSA-PKCS1-v1_5 signature
+// verifiable with rsa.VerifyPKCS1v15. rand is ignored (RSA PKCS#1 v1.5 is
+// deterministic).
 func (s *Signer) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	if s.closed {
 		return nil, fmt.Errorf("token signer already closed")
 	}
-	if opts == nil || opts.HashFunc() != crypto.SHA256 {
-		return nil, fmt.Errorf("token signer supports only SHA-256; got %v", hashName(opts))
-	}
-	if len(digest) != crypto.SHA256.Size() {
-		return nil, fmt.Errorf("token signer: digest length %d, expected %d for SHA-256", len(digest), crypto.SHA256.Size())
+	if opts == nil {
+		return nil, fmt.Errorf("token signer: nil SignerOpts")
 	}
 
-	payload := DigestInfoSHA256(digest)
+	var payload []byte
+	switch h := opts.HashFunc(); h {
+	case crypto.SHA256:
+		if len(digest) != crypto.SHA256.Size() {
+			return nil, fmt.Errorf("token signer: digest length %d, expected %d for SHA-256", len(digest), crypto.SHA256.Size())
+		}
+		payload = DigestInfoSHA256(digest)
+	case crypto.SHA1:
+		if len(digest) != crypto.SHA1.Size() {
+			return nil, fmt.Errorf("token signer: digest length %d, expected %d for SHA-1", len(digest), crypto.SHA1.Size())
+		}
+		payload = DigestInfoSHA1(digest)
+	default:
+		return nil, fmt.Errorf("token signer supports only SHA-256 (documents) or SHA-1 (mpass auth); got %v", hashName(opts))
+	}
+
 	mech := []*pkcs11.Mechanism{pkcs11.NewMechanism(CKM_RSA_PKCS, nil)}
 	if err := s.ctx.p.SignInit(s.sess, mech, s.key); err != nil {
 		return nil, fmt.Errorf("C_SignInit (CKM_RSA_PKCS) failed: %s", describeError(err))

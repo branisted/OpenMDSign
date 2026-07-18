@@ -85,7 +85,7 @@ func newSignCmd(gf *globalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&f.profile, "profile", "auto", "signature profile: auto | pades | xades")
 	cmd.Flags().StringVar(&f.level, "level", "t", "AdES level: b (no timestamp) | t (RFC 3161 timestamp)")
 	cmd.Flags().StringVar(&f.packaging, "xades-packaging", "detached", "XAdES packaging: detached | enveloping")
-	cmd.Flags().StringVar(&f.digest, "digest", "sha256", "digest algorithm (sha256; sha1 reserved for the auth-challenge case)")
+	cmd.Flags().StringVar(&f.digest, "digest", "sha256", "digest algorithm: sha256 (documents) | sha1 (interop-required, mpass auth challenge only)")
 	cmd.Flags().StringVar(&f.tsaURL, "tsa-url", defaultTSAURL, "RFC 3161 TSA URL (level t only)")
 	cmd.Flags().StringVar(&f.chain, "chain", "", "PEM bundle of the issuer chain (issuing CA + root) to embed (PAdES)")
 	cmd.Flags().StringVar(&f.dssHelper, "dss-helper", "", "path to the EU DSS helper jar (XAdES). Default: "+defaultDSSHelperJar+" or $OPENMDSIGN_DSS_HELPER")

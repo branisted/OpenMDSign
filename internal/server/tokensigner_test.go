@@ -40,13 +40,21 @@ func TestMapSignFormatXAdESDocument(t *testing.T) {
 	}
 }
 
-func TestMapSignFormatAuthChallengeNotWired(t *testing.T) {
-	// A short (~20-byte) Text pre-hash is the mpass auth challenge: recognized,
-	// but deliberately not wired.
+func TestMapSignFormatAuthChallenge(t *testing.T) {
+	// A short (~20-byte) Text pre-hash is the mpass auth challenge ⇒ XAdES-T
+	// ENVELOPING with SHA-1 (interop-required), auth-flagged for the dialog.
 	challenge := make([]byte, 20) // SHA-1 sized pre-hash
-	_, err := mapSignFormat(SignRequest{SignFormat: "XAdES-T", ContentType: "Text", Data: challenge})
-	if !errors.Is(err, ErrAuthChallengeNotWired) {
-		t.Fatalf("auth challenge err = %v, want ErrAuthChallengeNotWired", err)
+	p, err := mapSignFormat(SignRequest{SignFormat: "XAdES-T", ContentType: "Text", Data: challenge})
+	if err != nil {
+		t.Fatalf("auth challenge mapping error: %v", err)
+	}
+	if p.profile != "xades" || p.formatSeg != "XAdES" || p.packaging != sign.PackagingEnveloping ||
+		p.digest != "sha1" || p.level != sign.LevelT || !p.isAuth {
+		t.Fatalf("auth challenge params = %+v", p)
+	}
+	// The neutral input name must never carry a filesystem path (anti-leak).
+	if strings.ContainsAny(p.inputName, `/\`) {
+		t.Fatalf("auth input name must be a neutral basename, got %q", p.inputName)
 	}
 }
 
@@ -122,20 +130,30 @@ func TestTokenSignerThreadsOriginToConfirmer(t *testing.T) {
 	}
 }
 
-func TestTokenSignerAuthChallengeStopsBeforeConfirm(t *testing.T) {
-	conf := &recordingConfirmer{}
+func TestTokenSignerAuthChallengeReachesConfirmAsAuth(t *testing.T) {
+	// The mpass auth challenge is now wired: it must reach the confirm/PIN gate
+	// flagged as an authentication request (so the dialog says "log you in"), and
+	// a cancel there aborts before any token access.
+	conf := &recordingConfirmer{cancel: true}
 	ts := NewTokenSigner(TokenSignerConfig{}, conf, nil)
 	_, err := ts.Sign(context.Background(), SignRequest{
 		SignFormat:  "XAdES-T",
 		ContentType: "Text",
 		Data:        make([]byte, 20),
 		Certificate: json.RawMessage(`{"certificateId":"aabbcc"}`),
+		Origin:      "https://mpass.gov.md",
 	})
-	if !errors.Is(err, ErrAuthChallengeNotWired) {
-		t.Fatalf("err = %v, want ErrAuthChallengeNotWired", err)
+	if !errors.Is(err, ErrUserCancelled) {
+		t.Fatalf("err = %v, want ErrUserCancelled", err)
 	}
-	if conf.seen {
-		t.Fatal("auth-challenge must be rejected before the confirm/PIN gate")
+	if !conf.seen {
+		t.Fatal("auth-challenge must reach the confirm/PIN gate")
+	}
+	if !conf.last.IsAuth {
+		t.Fatal("confirm request for the mpass challenge must be flagged IsAuth")
+	}
+	if conf.last.Origin != "https://mpass.gov.md" {
+		t.Fatalf("confirm Origin = %q, want the mpass origin", conf.last.Origin)
 	}
 }
 
@@ -286,17 +304,28 @@ func TestHandlerCancelMapsTo403(t *testing.T) {
 	}
 }
 
-func TestHandlerAuthChallengeMapsTo501(t *testing.T) {
-	s := newTestServer(t, WithCertProvider(fakeCertProvider{}), WithSigner(errSigner{err: ErrAuthChallengeNotWired}))
-	body := `{"signFormat":"XAdES-T","contentType":"Text","certificate":{"certificateId":"aabbcc"},"data":""}`
-	req := httptest.NewRequest(http.MethodPost, "/sign/data", strings.NewReader(body))
+func TestHandlerAuthChallengeRoutesToSigner(t *testing.T) {
+	// An auth-shaped XAdES-T body now routes to the signer (no longer 501) and,
+	// behind a completed signer, returns 201 + a .../XAdES Location.
+	s := newTestServer(t, WithCertProvider(fakeCertProvider{}), WithSigner(&stubResultSigner{format: "XAdES"}))
+	// A short base64 pre-hash challenge (20 bytes) with contentType Text.
+	body := map[string]any{
+		"signFormat":  "XAdES-T",
+		"contentType": "Text",
+		"certificate": map[string]any{"certificateId": "aabbcc"},
+		"data":        base64.StdEncoding.EncodeToString(make([]byte, 20)),
+	}
+	b, _ := json.Marshal(body)
+	req := httptest.NewRequest(http.MethodPost, "/sign/data", strings.NewReader(string(b)))
+	req.Header.Set("Origin", "https://mpass.gov.md")
 	rr := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rr, req)
-	if rr.Code != http.StatusNotImplemented {
-		t.Fatalf("auth-challenge status = %d, want 501; body=%s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("auth-challenge status = %d, want 201; body=%s", rr.Code, rr.Body.String())
 	}
-	if !strings.Contains(rr.Body.String(), "auth-challenge") {
-		t.Errorf("body should explain the auth-challenge gap; got %s", rr.Body.String())
+	want := "https://localhost.cts.md:18443/sign/data/PKCS11/job-xyz/XAdES"
+	if loc := rr.Header().Get("Location"); loc != want {
+		t.Fatalf("Location = %q, want %q", loc, want)
 	}
 }
 

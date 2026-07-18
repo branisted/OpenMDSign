@@ -163,11 +163,14 @@ public final class Main {
             tsp.setDataLoader(new TimestampDataLoader());
             svc.setTspSource(tsp);
             // The MoldSign TSA (MDQTSA) accepts a SHA-256 request digest and
-            // rejects DSS's default (SHA-512) with PKIFailureInfo 0x80. Pin the
-            // SignatureTimeStamp digest to the profile digest, and canonicalize
-            // the timestamped SignatureValue with plain C14N 1.0 (no comments).
+            // rejects DSS's default (SHA-512) with PKIFailureInfo 0x80. The
+            // SignatureTimeStamp request digest is INDEPENDENT of the signature
+            // digest: pin it to SHA-256 even on the SHA-1 mpass auth path (the TSA
+            // rejects a SHA-1 request too; the captured auth.xades TST imprint is
+            // sha256). Canonicalize the timestamped SignatureValue with plain
+            // C14N 1.0 (no comments), matching the capture.
             eu.europa.esig.dss.xades.XAdESTimestampParameters tsParams = p.getSignatureTimestampParameters();
-            tsParams.setDigestAlgorithm(this.digestAlgo);
+            tsParams.setDigestAlgorithm(DigestAlgorithm.SHA256);
             tsParams.setCanonicalizationMethod("http://www.w3.org/TR/2001/REC-xml-c14n-20010315");
         }
         this.service = svc;

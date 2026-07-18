@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/sha256"
 	"testing"
 )
@@ -61,5 +62,56 @@ func TestTokenSignerDigestPathVerifies(t *testing.T) {
 	}
 	if !bytes.Equal(sig, ref) {
 		t.Fatalf("token-path signature != standard SHA-256 signature")
+	}
+}
+
+// TestDigestInfoSHA1Prefix pins the exact 15-byte SHA-1 DigestInfo prefix (the
+// interop-required mpass authentication path).
+func TestDigestInfoSHA1Prefix(t *testing.T) {
+	di := DigestInfoSHA1(make([]byte, 20))
+	if len(di) != 15+20 {
+		t.Fatalf("DigestInfo length = %d, want %d", len(di), 15+20)
+	}
+	want := []byte{
+		0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e,
+		0x03, 0x02, 0x1a, 0x05, 0x00, 0x04, 0x14,
+	}
+	if !bytes.Equal(di[:15], want) {
+		t.Fatalf("prefix = %x, want %x", di[:15], want)
+	}
+}
+
+// TestTokenSignerSHA1DigestPathVerifies mirrors the SHA-256 round-trip for the
+// SHA-1 mpass auth path: raw RSASSA-PKCS1-v1_5 over DigestInfoSHA1(digest) must
+// verify with the standard rsa.VerifyPKCS1v15(crypto.SHA1) and be byte-identical
+// to what the standard library produces. SHA-1 here is interop-required, not a
+// general default.
+func TestTokenSignerSHA1DigestPathVerifies(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	// The mpass DTBS is hashed with SHA-1 before the token step.
+	dtbs := []byte("mpass SignedInfo data-to-be-signed stand-in")
+	digest := sha1.Sum(dtbs)
+
+	// Emulate Signer.Sign's on-token step: raw CKM_RSA_PKCS over the DigestInfo.
+	payload := DigestInfoSHA1(digest[:])
+	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.Hash(0), payload)
+	if err != nil {
+		t.Fatalf("raw sign DigestInfo: %v", err)
+	}
+
+	if err := rsa.VerifyPKCS1v15(&key.PublicKey, crypto.SHA1, digest[:], sig); err != nil {
+		t.Fatalf("VerifyPKCS1v15(SHA1) rejected the token-path signature: %v", err)
+	}
+
+	ref, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA1, digest[:])
+	if err != nil {
+		t.Fatalf("reference sign: %v", err)
+	}
+	if !bytes.Equal(sig, ref) {
+		t.Fatalf("token-path signature != standard SHA-1 signature")
 	}
 }
