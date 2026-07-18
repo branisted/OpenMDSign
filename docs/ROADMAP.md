@@ -35,7 +35,7 @@ is not a separate project — it is a second consumer of the core.
 - ✅ README rewritten for the current state; `Makefile` (`build`/`jar`/`test`/`release`); release tarball builds (both bins + DSS jar). Git history scrubbed of the personal name (original retained locally under `refs/original/`, never pushed). Ready to push to GitHub.
 
 **Implemented, browser-acceptance pending your test:**
-- 🔶 **mpass auth** — XAdES-T SHA-1 enveloping challenge now signed + daemon-wired (was a 501 stub). Structurally matches the captured `auth.xades` on all central items; DSS's enveloping mode diverges on reference-transform construction (see profile-spec §1.1). Whether mpass.gov.md accepts the DSS variant needs a real in-browser login to confirm.
+- 🔶 **mpass auth** — first attempt (DSS enveloping) was REJECTED by mpass: DSS's construction digests the decoded challenge and hardwires a SignedProperties transform + reference order it can't override. Replaced with a **dedicated pure-Go XAdES-T SHA-1 signer** (`internal/sign/xadesauth`) that matches the vendor byte-construction. **C14N oracle PASSES** — our SHA1(C14N(Object)) and SHA1(C14N(SignedProperties)) equal the vendor's real DigestValues exactly, so the digests a verifier recomputes will match. Daemon `isAuth` path routes here; document XAdES stays on DSS. Final gate: a live in-browser mpass login.
 
 **Remaining / optional:**
 - ▫ **P4 LTV** — PDF `/DSS` store + XAdES-C references (archival long-term validity; optional).
