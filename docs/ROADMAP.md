@@ -32,8 +32,10 @@ is not a separate project — it is a second consumer of the core.
 - ✅ **msign document signing works end-to-end IN THE BROWSER** (user-confirmed).
 
 **In progress:**
-- ⏳ **mpass auth** — XAdES-T SHA-1 enveloping challenge (was a 501 stub; dissected from the real login capture; being wired now).
-- ⏳ **Repo readiness** — README + build/run docs + release binaries.
+- ⏳ **Repo readiness** — README + build/run docs + release binaries; then history scrub.
+
+**Implemented, browser-acceptance pending your test:**
+- 🔶 **mpass auth** — XAdES-T SHA-1 enveloping challenge now signed + daemon-wired (was a 501 stub). Structurally matches the captured `auth.xades` on all central items; DSS's enveloping mode diverges on reference-transform construction (see profile-spec §1.1). Whether mpass.gov.md accepts the DSS variant needs a real in-browser login to confirm.
 
 **Remaining / optional:**
 - ▫ **P4 LTV** — PDF `/DSS` store + XAdES-C references (archival long-term validity; optional).
