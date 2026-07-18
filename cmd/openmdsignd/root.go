@@ -85,7 +85,8 @@ func newServeCmd(gf *globalFlags) *cobra.Command {
 		Short: "Run the loopback HTTPS daemon (PROTOCOL.md §1–4)",
 		Long: "serve binds the loopback HTTPS listener (default 127.0.0.1:18443 for host\n" +
 			"localhost.cts.md) and answers the three PROTOCOL.md routes: GET /certificates,\n" +
-			"POST /sign/data (501 until Phase C), and GET /sign/data/PKCS11/{uuid}/{format}.\n\n" +
+			"POST /sign/data (signs with --module; 501 stub without one), and\n" +
+			"GET /sign/data/PKCS11/{uuid}/{format}.\n\n" +
 			"TLS uses a PERSISTENT per-machine self-signed leaf for localhost.cts.md (Daemon\n" +
 			"Phase D), generated on first run under ~/Library/Application Support/openmdsign/tls.\n" +
 			"Run 'openmdsignd trust install' once to add it to your login keychain as a trusted\n" +
