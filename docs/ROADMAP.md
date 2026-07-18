@@ -20,6 +20,30 @@ is not a separate project — it is a second consumer of the core.
 
 ---
 
+## Progress — where we are (2026-07-18)
+
+**Done & proven on real infrastructure:**
+- ✅ **Signing core** — PKCS#11 single-login `crypto.Signer`; PAdES-B-T (pure Go) + XAdES-T (EU DSS).
+- ✅ **CLI** `openmdsign` — `inspect`, `sign-raw`, `sign` (PAdES + XAdES), `verify`.
+- ✅ **PAdES-B-T** — VALID via msign.gov.md web verifier.
+- ✅ **XAdES-T detached** — VALID in the MoldSign desktop app.
+- ✅ **`verify`** — our own signatures independently confirmed valid against embedded STISC anchors.
+- ✅ **Daemon `openmdsignd`** A–D — HTTPS loopback, 3 routes, strict CORS, `/certificates`, wired signers + native PIN/confirm gate, trusted self-signed leaf (`trust install`).
+- ✅ **msign document signing works end-to-end IN THE BROWSER** (user-confirmed).
+
+**In progress:**
+- ⏳ **mpass auth** — XAdES-T SHA-1 enveloping challenge (was a 501 stub; dissected from the real login capture; being wired now).
+- ⏳ **Repo readiness** — README + build/run docs + release binaries.
+
+**Remaining / optional:**
+- ▫ **P4 LTV** — PDF `/DSS` store + XAdES-C references (archival long-term validity; optional).
+- ▫ **Open probes** — CORS allowlist scope re-check; document-XAdES-over-non-PDF digest confirmation.
+- ▫ **History scrub** — remove the personal name from commit `bd7210d` before publishing (last step).
+
+**Explicitly dropped (user scope):** Homebrew/notarized-dmg packaging (P5); launchd auto-start (Daemon E) — the daemon runs standalone via `openmdsignd serve` on demand.
+
+---
+
 ## Status at a glance
 
 | Track | Phase | State |
