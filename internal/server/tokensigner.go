@@ -17,6 +17,7 @@ import (
 	"github.com/branistedev/openmdsign/internal/sign"
 	"github.com/branistedev/openmdsign/internal/sign/pades"
 	"github.com/branistedev/openmdsign/internal/sign/xades"
+	"github.com/branistedev/openmdsign/internal/sign/xadesauth"
 	"github.com/branistedev/openmdsign/internal/token"
 )
 
@@ -337,10 +338,16 @@ func (ts *TokenSigner) signWithToken(ctx context.Context, params signParams, key
 	outPath := filepath.Join(dir, "container")
 
 	var profileSigner sign.Signer
-	switch params.profile {
-	case "pades":
+	switch {
+	case params.profile == "pades":
 		profileSigner = pades.New()
-	case "xades":
+	case params.profile == "xades" && params.isAuth:
+		// The mpass authentication XAdES-T is hand-built by our dedicated pure-Go
+		// signer: DSS cannot produce its reference order (SignedProperties first)
+		// nor its enveloped-file digest (SHA-1 over C14N of the <ds:Object>). The
+		// document XAdES path below stays on DSS, byte-for-byte unchanged.
+		profileSigner = xadesauth.New()
+	case params.profile == "xades":
 		profileSigner = xades.New(ts.cfg.JavaPath)
 	default:
 		return SignResult{}, fmt.Errorf("%w: internal profile %q", ErrUnsupportedSignFormat, params.profile)
