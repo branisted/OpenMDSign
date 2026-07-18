@@ -28,7 +28,7 @@ is not a separate project — it is a second consumer of the core.
 | Core/CLI | P1 `sign-raw` proof-of-life | ✅ done, hardware-validated |
 | Core/CLI | **P2a PAdES-B-T signer** | ✅ **done — VALID via msign.gov.md/#/verify/upload** |
 | Core/CLI | P2b XAdES-T signer (EU DSS) | ✅ **done — VALID in MoldSign app (detached, XAdES-T, cert+TSA+timestamp shown)** |
-| Core/CLI | P3 `verify` + trust anchors | ⏳ in progress |
+| Core/CLI | P3 `verify` + trust anchors | ✅ done — our PAdES VALID; our XAdES chain-trusted (VALID with --check-revocation) |
 | Core/CLI | P4 LTV / XAdES-C, `/DSS` store | ▫ todo (optional) |
 | Core/CLI | P5 packaging (brew, notarized dmg) | ▫ todo |
 | Daemon | A protocol freeze (`PROTOCOL.md`) | ✅ done |
