@@ -31,11 +31,12 @@ is not a separate project — it is a second consumer of the core.
 - ✅ **Daemon `openmdsignd`** A–D — HTTPS loopback, 3 routes, strict CORS, `/certificates`, wired signers + native PIN/confirm gate, trusted self-signed leaf (`trust install`).
 - ✅ **msign document signing works end-to-end IN THE BROWSER** (user-confirmed).
 
+**mpass auth — DONE & browser-confirmed (2026-07-18):**
+- ✅ **mpass.gov.md login works.** Dedicated pure-Go XAdES-T SHA-1 signer (`internal/sign/xadesauth`) matching the vendor byte-structure exactly (issuer-DN rendering, C14N-of-Object digest, DataObjectFormat, 64-col base64 wrapping). Reached after 3 browser rounds converging on the accepted vendor `auth.xades`. Document XAdES stays on DSS.
+
 **Repo readiness — done:**
 - ✅ README rewritten for the current state; `Makefile` (`build`/`jar`/`test`/`release`); release tarball builds (both bins + DSS jar). Git history scrubbed of the personal name (original retained locally under `refs/original/`, never pushed). Ready to push to GitHub.
 
-**Implemented, browser-acceptance pending your test:**
-- 🔶 **mpass auth** — dedicated pure-Go XAdES-T SHA-1 signer (`internal/sign/xadesauth`); document XAdES stays on DSS. Two browser tests rejected (mpass gives no error, just bounces); each round eliminated real divergences from the vendor's accepted `auth.xades` (same cert): DSS transforms → replaced; then issuer-DN format, DataObjectFormat, and 64-col base64 wrapping. Now **byte-structurally identical to the accepted vendor signature** except unavoidable per-signature values — verified offline by: C14N digest oracle (== vendor DigestValues), issuer-DN oracle (== vendor X509IssuerName exactly), internal-validity, and a full structural diff. Awaiting the 3rd in-browser test. If it still rejects at full structural parity, mpass is checking something not present in the signature.
 
 **Remaining / optional:**
 - ▫ **P4 LTV** — PDF `/DSS` store + XAdES-C references (archival long-term validity; optional).
