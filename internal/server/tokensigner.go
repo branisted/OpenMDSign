@@ -242,12 +242,18 @@ func looksLikePDFBytes(b []byte) bool {
 func (ts *TokenSigner) Sign(ctx context.Context, req SignRequest) (SignResult, error) {
 	params, err := mapSignFormat(req)
 	if err != nil {
+		ts.log.Warn("sign: unsupported request", "signFormat", req.SignFormat, "contentType", req.ContentType, "err", err.Error())
 		return SignResult{}, err
 	}
+	ts.log.Info("sign: request accepted",
+		"origin", req.Origin, "signFormat", req.SignFormat, "contentType", req.ContentType,
+		"dataLen", len(req.Data), "profile", params.profile, "digest", params.digest,
+		"packaging", string(params.packaging), "isAuth", params.isAuth)
 
 	// Recover the on-token key: the CKA_ID hex from the verbatim certificateModel.
 	keyID, err := certificateID(req.Certificate)
 	if err != nil {
+		ts.log.Warn("sign: could not read certificateId from request", "err", err.Error())
 		return SignResult{}, err
 	}
 
@@ -258,6 +264,7 @@ func (ts *TokenSigner) Sign(ctx context.Context, req SignRequest) (SignResult, e
 
 	// ── §7 confirm + PIN gate — BEFORE any token access ──────────────────────
 	// The dialog names the requesting Origin so the user authorizes THIS site.
+	ts.log.Info("sign: prompting for confirmation + PIN", "origin", req.Origin, "isAuth", params.isAuth)
 	pin, err := ts.confirmer.Confirm(ctx, ConfirmRequest{
 		Origin:      req.Origin,
 		ContentType: req.ContentType,
@@ -266,15 +273,26 @@ func (ts *TokenSigner) Sign(ctx context.Context, req SignRequest) (SignResult, e
 		IsAuth:      params.isAuth,
 	})
 	if err != nil {
-		// A cancel/deny aborts before ANY token access. Normalize to the typed
-		// error the handler maps to a non-201 (never leak dialog internals).
+		// A real user Cancel aborts before ANY token access — that is a normal
+		// outcome, logged at info. A dialog that could NOT run (ErrConfirmUnavailable)
+		// is a real failure the operator must see: log it loudly and return it as
+		// itself (→ 500) rather than masquerading as a user cancel (the old bug
+		// that made a broken dialog look like a silent decline).
 		if errors.Is(err, ErrUserCancelled) {
+			ts.log.Info("sign: declined by user at confirmation", "origin", req.Origin)
 			return SignResult{}, ErrUserCancelled
 		}
-		return SignResult{}, fmt.Errorf("%w (confirm failed: %v)", ErrUserCancelled, err)
+		ts.log.Error("sign: confirmation dialog could not run", "origin", req.Origin, "err", err.Error())
+		return SignResult{}, err
 	}
 
+	ts.log.Info("sign: confirmed; opening token", "origin", req.Origin)
 	res, err := ts.signWithToken(ctx, params, keyID, pin, req)
+	if err != nil {
+		ts.log.Warn("sign: token signing failed", "profile", params.profile, "err", err.Error())
+	} else {
+		ts.log.Info("sign: completed", "format", res.Format, "bytes", len(res.Base64File))
+	}
 	// Scrub our copy of the PIN as soon as the single login attempt is done.
 	pin = strings.Repeat("x", len(pin))
 	_ = pin

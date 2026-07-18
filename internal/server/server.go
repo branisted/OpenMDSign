@@ -98,8 +98,34 @@ func New(cfg Config, opts ...Option) *Server {
 	if s.signer == nil {
 		s.signer = NewStubSigner()
 	}
-	s.handler = s.corsMiddleware(s.routes())
+	s.handler = s.logMiddleware(s.corsMiddleware(s.routes()))
 	return s
+}
+
+// statusRecorder captures the response status for the access log.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+// logMiddleware writes one access-log line per request so the daemon is not
+// silent after startup. It records method, path, the requesting Origin, and the
+// response status. It never logs bodies (which may carry a document, a challenge,
+// or — on other paths — nothing sensitive, but never a PIN, which lives only
+// inside the Confirmer).
+func (s *Server) logMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		s.log.Info("request",
+			"method", r.Method, "path", r.URL.Path,
+			"origin", r.Header.Get("Origin"), "status", rec.status)
+	})
 }
 
 // Handler exposes the fully-wired http.Handler (CORS + routes) for httptest.
@@ -200,6 +226,9 @@ func (s *Server) handleSign(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<20)) // 64 MiB cap
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&body); err != nil {
+		// Log it: an unexpected/extra field or malformed body would otherwise be a
+		// silent 400 (the page shows a generic error and no PIN dialog appears).
+		s.log.Warn("sign: rejected malformed request body", "err", err.Error())
 		s.writeError(w, http.StatusBadRequest, "invalid JSON body: "+err.Error())
 		return
 	}
@@ -212,16 +241,19 @@ func (s *Server) handleSign(w http.ResponseWriter, r *http.Request) {
 	case "PAdES-T", "XAdES-T":
 		// ok
 	default:
+		s.log.Warn("sign: unsupported signFormat", "signFormat", body.SignFormat)
 		s.writeError(w, http.StatusBadRequest,
 			fmt.Sprintf("unsupported signFormat %q (want PAdES-T or XAdES-T)", body.SignFormat))
 		return
 	}
 	if len(body.Certificate) == 0 {
+		s.log.Warn("sign: missing certificate object")
 		s.writeError(w, http.StatusBadRequest, "missing certificate object")
 		return
 	}
 	data, err := base64.StdEncoding.DecodeString(body.Data)
 	if err != nil {
+		s.log.Warn("sign: data not valid base64", "err", err.Error())
 		s.writeError(w, http.StatusBadRequest, "data is not valid base64: "+err.Error())
 		return
 	}
@@ -252,8 +284,18 @@ func (s *Server) handleSign(w http.ResponseWriter, r *http.Request) {
 			// The user declined the per-operation confirmation dialog (§7). No
 			// token access occurred. The exact vendor error shape for a cancel
 			// is unconfirmed (PROTOCOL.md §8.3); we answer 403 with a small body.
+			s.log.Info("sign: cancelled by user", "signFormat", body.SignFormat)
 			s.writeError(w, http.StatusForbidden, "signing cancelled by user")
+		case errors.Is(err, ErrConfirmUnavailable):
+			// The confirmation dialog could not be shown at all — a real operator
+			// problem (no GUI session, osascript missing, TCC denial). Make it
+			// loud and distinct from a user cancel; tokensigner already logged the
+			// reason at error level.
+			s.log.Error("sign: confirmation dialog unavailable", "err", err.Error())
+			s.writeError(w, http.StatusInternalServerError,
+				"confirmation dialog could not be shown (run openmdsignd in your GUI login session; see server logs)")
 		case errors.Is(err, ErrUnsupportedSignFormat):
+			s.log.Warn("sign: unsupported signFormat (signer)", "signFormat", body.SignFormat)
 			s.writeError(w, http.StatusBadRequest, err.Error())
 		default:
 			// Never surface the raw error to the client (may name internals); log

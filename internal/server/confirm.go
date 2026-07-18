@@ -1,11 +1,19 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
 )
+
+// ErrConfirmUnavailable is returned when the confirmation dialog could not be
+// shown at all (osascript missing, no GUI session, TCC denial, …) — as opposed
+// to the user actively cancelling. The caller logs the reason and maps it to a
+// 500 so the failure is visible, never silently treated as a user cancel.
+var ErrConfirmUnavailable = errors.New("openmdsignd: confirmation dialog unavailable")
 
 // osascriptConfirmer is the production Confirmer: a native macOS dialog driven by
 // osascript. It presents WHAT is being signed — the requesting Origin, the
@@ -52,13 +60,23 @@ return text returned of result
 end run`
 
 	cmd := exec.CommandContext(ctx, "osascript", "-e", script, "--", message)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		// osascript exits non-zero when the user presses Cancel (error -128) or
-		// closes the dialog. Treat every declined/aborted dialog as a cancel so
-		// no token access is attempted. Never include the PIN (there is none on
-		// this path) and never echo stderr verbatim to the client.
-		return "", ErrUserCancelled
+		// Distinguish an actual user Cancel from a dialog that could not run at
+		// all. On Cancel, `display dialog` raises AppleScript error -128 ("User
+		// canceled"); osascript prints that to stderr and exits non-zero. Any
+		// OTHER stderr (osascript missing, no window server / not run in the
+		// user's GUI session, TCC denial, timeout) means the dialog never gave the
+		// user a choice — surface that distinctly so it is logged, not silently
+		// swallowed as a cancel. Stderr never contains a PIN (hidden-answer output
+		// goes to stdout only, and only on success).
+		msg := strings.ToLower(stderr.String())
+		if strings.Contains(msg, "-128") || strings.Contains(msg, "user canceled") || strings.Contains(msg, "user cancelled") {
+			return "", ErrUserCancelled
+		}
+		return "", fmt.Errorf("%w: %s", ErrConfirmUnavailable, strings.TrimSpace(stderr.String()))
 	}
 	pin := strings.TrimRight(string(out), "\r\n")
 	if pin == "" {
