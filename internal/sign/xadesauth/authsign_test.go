@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -215,6 +216,44 @@ func TestVendorOracle(t *testing.T) {
 	t.Logf("ORACLE OK: file-ref=%s sp-ref=%s", fileRefDigest, spRefDigest)
 }
 
+// TestIssuerDNOracle is the go/no-go for the DN renderer: it parses the issuer
+// from the real signing cert and asserts renderIssuerDN produces EXACTLY the
+// X509IssuerName string inside the vendor's accepted auth.xades (same issuer ⇒
+// must match byte-for-byte). Env-guarded so neither the cert nor the sample is
+// committed. Set OPENMDSIGN_AUTH_CERT (DER path) and OPENMDSIGN_AUTH_ORACLE
+// (auth.xades path) to run it.
+func TestIssuerDNOracle(t *testing.T) {
+	certPath := os.Getenv("OPENMDSIGN_AUTH_CERT")
+	xadesPath := os.Getenv("OPENMDSIGN_AUTH_ORACLE")
+	if certPath == "" || xadesPath == "" {
+		t.Skip("set OPENMDSIGN_AUTH_CERT and OPENMDSIGN_AUTH_ORACLE to run the DN oracle")
+	}
+	der, err := os.ReadFile(certPath)
+	if err != nil {
+		t.Fatalf("read cert: %v", err)
+	}
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatalf("parse cert: %v", err)
+	}
+	doc := etree.NewDocument()
+	if err := doc.ReadFromFile(xadesPath); err != nil {
+		t.Fatalf("read oracle: %v", err)
+	}
+	want := doc.Root().FindElement("ds:Object/xades:QualifyingProperties/xades:SignedProperties/xades:SignedSignatureProperties/xades:SigningCertificate/xades:Cert/xades:IssuerSerial/ds:X509IssuerName")
+	if want == nil {
+		t.Fatalf("vendor X509IssuerName not found")
+	}
+	got, err := renderIssuerDN(cert)
+	if err != nil {
+		t.Fatalf("renderIssuerDN: %v", err)
+	}
+	if got != want.Text() {
+		t.Fatalf("DN ORACLE FAIL:\n got=%q\nwant=%q", got, want.Text())
+	}
+	t.Logf("DN ORACLE OK: %s", got)
+}
+
 // ── structural + internal-validity assertion (software key, mock TSA) ───────
 
 func buildSample(t *testing.T) (*etree.Document, *rsa.PrivateKey, *x509.Certificate) {
@@ -334,13 +373,24 @@ func TestBuildStructure(t *testing.T) {
 		t.Fatalf("CertDigest mismatch")
 	}
 
-	// DataObjectFormat: MimeType present, NO Description (no path leak).
+	// DataObjectFormat: ObjectReference is the file-Reference Id VERBATIM (no
+	// leading '#'), children in schema order Description then MimeType, and the
+	// Description carries the NEUTRAL basename (never a filesystem path).
 	dof := childElem(t, sp, "xades:SignedDataObjectProperties", "xades:DataObjectFormat")
-	if dof.FindElement("xades:Description") != nil {
-		t.Fatalf("DataObjectFormat MUST NOT carry Description (path leak)")
+	fileRefID := refs[1].SelectAttrValue("Id", "")
+	if got := dof.SelectAttrValue("ObjectReference", ""); got != fileRefID {
+		t.Fatalf("DataObjectFormat ObjectReference %q, want file-ref Id %q (no leading #)", got, fileRefID)
 	}
-	if dof.FindElement("xades:MimeType") == nil {
-		t.Fatalf("DataObjectFormat MimeType missing")
+	dofChildren := dof.ChildElements()
+	if len(dofChildren) != 2 || dofChildren[0].Tag != "Description" || dofChildren[1].Tag != "MimeType" {
+		t.Fatalf("DataObjectFormat children must be [Description, MimeType], got %v", dofChildren)
+	}
+	desc := dof.FindElement("xades:Description").Text()
+	if desc != "authentication-challenge" {
+		t.Fatalf("Description must be the neutral basename, got %q", desc)
+	}
+	if strings.ContainsAny(desc, "/\\") || strings.Contains(desc, ":") {
+		t.Fatalf("Description must not leak a filesystem path: %q", desc)
 	}
 
 	// SignatureTimeStamp with plain C14N + EncapsulatedTimeStamp DER encoding.

@@ -31,6 +31,8 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -38,6 +40,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/beevik/etree"
@@ -177,7 +180,7 @@ func Build(ctx context.Context, p Params) ([]byte, error) {
 	keyInfo.CreateAttr("Id", ids.keyInfo)
 	x509Data := keyInfo.CreateElement("ds:X509Data")
 	x509Cert := x509Data.CreateElement("ds:X509Certificate")
-	x509Cert.SetText(base64.StdEncoding.EncodeToString(p.Certificate.Raw))
+	x509Cert.SetText(wrapBase64(base64.StdEncoding.EncodeToString(p.Certificate.Raw)))
 
 	// ── ds:Object > QualifyingProperties (declares xmlns:xades) ─────────────
 	qpObj := sigEl.CreateElement("ds:Object")
@@ -200,14 +203,22 @@ func Build(ctx context.Context, p Params) ([]byte, error) {
 	certSHA1 := sha1.Sum(p.Certificate.Raw)
 	certDigest.CreateElement("ds:DigestValue").SetText(base64.StdEncoding.EncodeToString(certSHA1[:]))
 	issuerSerial := cert.CreateElement("xades:IssuerSerial")
-	issuerSerial.CreateElement("ds:X509IssuerName").SetText(p.Certificate.Issuer.String())
+	issuerName, err := renderIssuerDN(p.Certificate)
+	if err != nil {
+		return nil, fmt.Errorf("xadesauth: render issuer DN: %w", err)
+	}
+	issuerSerial.CreateElement("ds:X509IssuerName").SetText(issuerName)
 	issuerSerial.CreateElement("ds:X509SerialNumber").SetText(p.Certificate.SerialNumber.String())
 
 	sdop := sp.CreateElement("xades:SignedDataObjectProperties")
 	sdop.CreateAttr("Id", ids.sdop)
 	dof := sdop.CreateElement("xades:DataObjectFormat")
-	dof.CreateAttr("ObjectReference", "#"+ids.fileRef)
-	// Deliberately NO xades:Description: the vendor leaks a local path there.
+	// ObjectReference is the file-Reference Id VERBATIM (no leading '#'), matching
+	// the vendor. Children order per XAdES schema: Description then MimeType. The
+	// vendor's Description leaks a local temp path; we emit the neutral basename so
+	// the element is present but discloses nothing.
+	dof.CreateAttr("ObjectReference", ids.fileRef)
+	dof.CreateElement("xades:Description").SetText(inputName)
 	dof.CreateElement("xades:MimeType").SetText(defaultMimeType)
 
 	// ── trailing ds:Object (FileObject) = base64(challenge) ─────────────────
@@ -239,7 +250,10 @@ func Build(ctx context.Context, p Params) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("xadesauth: token signature over SignedInfo failed: %w", err)
 	}
-	sigValEl.SetText(base64.StdEncoding.EncodeToString(sigBytes))
+	// The vendor wraps the SignatureValue base64 at 64 columns and timestamps the
+	// wrapped element; set the wrapped text BEFORE canonicalizing for the TSA so
+	// the token covers exactly the bytes we emit.
+	sigValEl.SetText(wrapBase64(base64.StdEncoding.EncodeToString(sigBytes)))
 
 	// ── SignatureTimeStamp: RFC 3161 token over C14N(ds:SignatureValue) ─────
 	svC14N, err := canonPlain(sigValEl)
@@ -259,7 +273,7 @@ func Build(ctx context.Context, p Params) ([]byte, error) {
 	tsCM.CreateAttr("Algorithm", c14nPlain)
 	ets := tsEl.CreateElement("xades:EncapsulatedTimeStamp")
 	ets.CreateAttr("Encoding", tsEncodingDER)
-	ets.SetText(base64.StdEncoding.EncodeToString(tsToken))
+	ets.SetText(wrapBase64(base64.StdEncoding.EncodeToString(tsToken)))
 
 	doc.WriteSettings = etree.WriteSettings{CanonicalEndTags: false}
 	out, err := doc.WriteToBytes()
@@ -361,6 +375,123 @@ func newUUID() (string, error) {
 	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
 	h := hex.EncodeToString(b[:])
 	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32], nil
+}
+
+// wrapBase64 splits a base64 string into 64-character lines joined by '\n' (no
+// leading/trailing newline, no indentation), matching the vendor's rendering of
+// the SignatureValue, X509Certificate and EncapsulatedTimeStamp text nodes.
+// Strings of 64 characters or fewer are returned unchanged.
+func wrapBase64(s string) string {
+	const width = 64
+	if len(s) <= width {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s) + len(s)/width)
+	for i := 0; i < len(s); i += width {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		end := i + width
+		if end > len(s) {
+			end = len(s)
+		}
+		b.WriteString(s[i:end])
+	}
+	return b.String()
+}
+
+// attrShortNames maps the X.520 attribute OIDs to the short symbols the vendor's
+// BouncyCastle-based renderer emits. Any OID not listed is rendered as its dotted
+// decimal form (this is why organizationIdentifier / 2.5.4.97 appears as
+// "2.5.4.97" and not "organizationIdentifier" — the vendor's DN style has no
+// symbol for it).
+var attrShortNames = map[string]string{
+	"2.5.4.3":                    "CN",           // commonName
+	"2.5.4.4":                    "SURNAME",      // surname
+	"2.5.4.5":                    "SERIALNUMBER", // serialNumber
+	"2.5.4.6":                    "C",            // countryName
+	"2.5.4.7":                    "L",            // localityName
+	"2.5.4.8":                    "ST",           // stateOrProvinceName
+	"2.5.4.9":                    "STREET",       // streetAddress
+	"2.5.4.10":                   "O",            // organizationName
+	"2.5.4.11":                   "OU",           // organizationalUnitName
+	"2.5.4.12":                   "T",            // title
+	"2.5.4.42":                   "GIVENNAME",    // givenName
+	"0.9.2342.19200300.100.1.1":  "UID",          // userid
+	"0.9.2342.19200300.100.1.25": "DC",           // domainComponent
+	"1.2.840.113549.1.9.1":       "E",            // emailAddress
+}
+
+// renderIssuerDN renders the certificate's issuer DN exactly as the vendor's
+// BouncyCastle-based signer does: RFC 2253 form with the RDNs in REVERSE of their
+// DER order, known attributes rendered by their short symbol and all others by
+// dotted-decimal OID, string values with RFC 2253 special-character escaping and
+// non-ASCII bytes escaped as "\" + uppercase UTF-8-byte hex.
+//
+// It parses cert.RawIssuer directly (rather than using cert.Issuer.String(),
+// which hex-encodes attributes it lacks a symbol for) so unknown attributes such
+// as organizationIdentifier keep their readable string value.
+func renderIssuerDN(cert *x509.Certificate) (string, error) {
+	var rdns pkix.RDNSequence
+	if _, err := asn1.Unmarshal(cert.RawIssuer, &rdns); err != nil {
+		return "", fmt.Errorf("parse issuer RDNSequence: %w", err)
+	}
+	parts := make([]string, 0, len(rdns))
+	for i := len(rdns) - 1; i >= 0; i-- {
+		atvs := make([]string, 0, len(rdns[i]))
+		for _, atv := range rdns[i] {
+			atvs = append(atvs, attrName(atv.Type)+"="+escapeRFC2253(atv.Value))
+		}
+		parts = append(parts, strings.Join(atvs, "+"))
+	}
+	return strings.Join(parts, ","), nil
+}
+
+// attrName returns the short symbol for a known attribute OID, else its dotted
+// decimal string.
+func attrName(oid asn1.ObjectIdentifier) string {
+	if s, ok := attrShortNames[oid.String()]; ok {
+		return s
+	}
+	return oid.String()
+}
+
+// escapeRFC2253 renders an attribute value as an RFC 2253 string. String values
+// are escaped per RFC 2253 §2.4 (with non-ASCII bytes hex-escaped as BouncyCastle
+// and OpenSSL's rfc2253 mode do); non-string values fall back to "#" + hex of the
+// raw DER, matching RFC 2253's hexstring form.
+func escapeRFC2253(v any) string {
+	s, ok := v.(string)
+	if !ok {
+		// Non-string ASN.1 value: emit the hexstring form. This path is not hit by
+		// the MDQSign issuer (all attributes are printable/UTF8 strings) but keeps
+		// the renderer total.
+		if raw, ok := v.([]byte); ok {
+			return "#" + hex.EncodeToString(raw)
+		}
+		return fmt.Sprintf("%v", v)
+	}
+	var b strings.Builder
+	bytesOf := []byte(s)
+	for i := 0; i < len(bytesOf); i++ {
+		c := bytesOf[i]
+		switch {
+		case c >= 0x80:
+			// Non-ASCII UTF-8 byte: escape as "\" + uppercase two-hex.
+			fmt.Fprintf(&b, "\\%02X", c)
+		case c == ',' || c == '+' || c == '"' || c == '\\' || c == '<' || c == '>' || c == ';':
+			b.WriteByte('\\')
+			b.WriteByte(c)
+		case (c == ' ' && (i == 0 || i == len(bytesOf)-1)) || (c == '#' && i == 0):
+			// Leading/trailing space, or leading '#'.
+			b.WriteByte('\\')
+			b.WriteByte(c)
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }
 
 // Signer adapts Build to the sign.Signer interface so the daemon can route the
