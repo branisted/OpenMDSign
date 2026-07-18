@@ -102,7 +102,7 @@ JSON in, JSON out.
 GET /certificates?private_only=true
 → 200  application/json
 {"certificateModel":[{
-   "certificateId":"379ee7b7446a43c3e125eb2a139c7bcbb0d9ab1e",
+   "certificateId":"<CKA_ID hex>",
    "label":"Nume Prenume...", "providerId":"eToken.dll-0",
    "policy":"1.2.498.3.32.1.1", "certificateName":"...(1.2.498.3.32.1.1)",
    "subjectDN":"C=MD,...,CN=Nume Prenume",
