@@ -29,13 +29,15 @@ is not a separate project — it is a second consumer of the core.
 | Core/CLI | **P2a PAdES-B-T signer** | ✅ **done — VALID via msign.gov.md/#/verify/upload** |
 | Core/CLI | P2b XAdES-T signer (EU DSS) | ✅ **done — VALID in MoldSign app (detached, XAdES-T, cert+TSA+timestamp shown)** |
 | Core/CLI | P3 `verify` + trust anchors | ✅ done — our PAdES VALID; our XAdES chain-trusted (VALID with --check-revocation) |
-| Core/CLI | P4 LTV / XAdES-C, `/DSS` store | ▫ todo (optional) |
-| Core/CLI | P5 packaging (brew, notarized dmg) | ▫ todo |
+| Core/CLI | P4 LTV / XAdES-C, `/DSS` store | ▫ todo (optional — long-term validation) |
+| Core/CLI | ~~P5 packaging (brew, notarized dmg)~~ | ✗ dropped — GitHub-repo-only, bins only |
+| Daemon | msign document signing in-browser | ✅ **works end-to-end (user-confirmed)** |
+| Daemon | mpass auth (XAdES SHA-1 challenge) | ▫ todo — currently 501 stub; needs real challenge capture |
 | Daemon | A protocol freeze (`PROTOCOL.md`) | ✅ done |
 | Daemon | B skeleton: HTTPS loopback + 3 routes + CORS + `/certificates` | ✅ done, merged |
 | Daemon | C wire signers + sync PIN/confirm gate | ✅ done, merged (PAdES/XAdES doc signing + native PIN/confirm; auth-challenge stubbed) |
 | Daemon | D TLS trust gate (`localhost.cts.md`) | ✅ done — trusted self-signed leaf + `openmdsignd trust install/uninstall/status` |
-| Daemon | E install/packaging (DNS/hosts, launchd) | ▫ todo |
+| Daemon | ~~E launchd auto-start / installer~~ | ✗ dropped — run `openmdsignd serve` standalone on demand; no launchd. Just ship the bins + `trust install`. |
 
 ---
 
