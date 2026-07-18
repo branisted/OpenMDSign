@@ -31,8 +31,8 @@ is not a separate project — it is a second consumer of the core.
 - ✅ **Daemon `openmdsignd`** A–D — HTTPS loopback, 3 routes, strict CORS, `/certificates`, wired signers + native PIN/confirm gate, trusted self-signed leaf (`trust install`).
 - ✅ **msign document signing works end-to-end IN THE BROWSER** (user-confirmed).
 
-**In progress:**
-- ⏳ **Repo readiness** — README + build/run docs + release binaries; then history scrub.
+**Repo readiness — done:**
+- ✅ README rewritten for the current state; `Makefile` (`build`/`jar`/`test`/`release`); release tarball builds (both bins + DSS jar). Git history scrubbed of the personal name (original retained locally under `refs/original/`, never pushed). Ready to push to GitHub.
 
 **Implemented, browser-acceptance pending your test:**
 - 🔶 **mpass auth** — XAdES-T SHA-1 enveloping challenge now signed + daemon-wired (was a 501 stub). Structurally matches the captured `auth.xades` on all central items; DSS's enveloping mode diverges on reference-transform construction (see profile-spec §1.1). Whether mpass.gov.md accepts the DSS variant needs a real in-browser login to confirm.
@@ -40,7 +40,7 @@ is not a separate project — it is a second consumer of the core.
 **Remaining / optional:**
 - ▫ **P4 LTV** — PDF `/DSS` store + XAdES-C references (archival long-term validity; optional).
 - ▫ **Open probes** — CORS allowlist scope re-check; document-XAdES-over-non-PDF digest confirmation.
-- ▫ **History scrub** — remove the personal name from commit `bd7210d` before publishing (last step).
+- 🧪 **mpass in-browser confirmation** — sign a real login and confirm mpass.gov.md accepts the DSS-built XAdES.
 
 **Explicitly dropped (user scope):** Homebrew/notarized-dmg packaging (P5); launchd auto-start (Daemon E) — the daemon runs standalone via `openmdsignd serve` on demand.
 
