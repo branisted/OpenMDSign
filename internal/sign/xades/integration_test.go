@@ -142,6 +142,117 @@ func TestXAdESIntegration(t *testing.T) {
 	}
 }
 
+// TestXAdESAuthChallengeIntegration drives the mpass authentication profile
+// end-to-end with a SOFTWARE key: a SHA-1 enveloping XAdES-T over a 20-byte
+// challenge (the shape captured from mpass.gov.md). It asserts SHA-1 EVERYWHERE
+// (rsa-sha1 SignatureMethod + sha1 DigestMethods), the enveloping FileObject
+// holds the base64 of the 20 bytes, SigningCertificate v1 (V2 absent), C14N
+// #WithComments on SignedInfo, and SignatureTimeStamp present; then it validates
+// the output through the DSS validator (throwaway cert ⇒ NO chain / INDETERMINATE
+// is expected and proves crypto + structure).
+//
+// SHA-1 is exercised here because the government auth protocol mandates it for
+// interop; it is NOT a general default (documents use SHA-256).
+func TestXAdESAuthChallengeIntegration(t *testing.T) {
+	if os.Getenv("OPENMDSIGN_XADES_IT") != "1" {
+		t.Skip("set OPENMDSIGN_XADES_IT=1 (and OPENMDSIGN_DSS_HELPER) to run the DSS jar integration test")
+	}
+	jar := os.Getenv("OPENMDSIGN_DSS_HELPER")
+	if jar == "" {
+		t.Skip("OPENMDSIGN_DSS_HELPER (path to dss-helper.jar) not set")
+	}
+	javaPath := os.Getenv("OPENMDSIGN_JAVA")
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "OpenMDSign Auth IT", Organization: []string{"Test"}},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A 20-byte SHA-1-sized pre-hash challenge (the mpass `data`).
+	challenge := make([]byte, 20)
+	for i := range challenge {
+		challenge[i] = byte(i * 7)
+	}
+
+	out := filepath.Join(t.TempDir(), "auth.xml")
+	res, err := New(javaPath).Sign(context.Background(), sign.Request{
+		InputPDF:    challenge,
+		InputName:   "authentication-challenge",
+		OutputPath:  out,
+		Signer:      key,
+		Certificate: cert,
+		Level:       sign.LevelT,
+		TSAURL:      "http://tsp.pki.gov.md/moldsign2/",
+		Packaging:   sign.PackagingEnveloping,
+		Digest:      "sha1",
+		HelperJar:   jar,
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	if !res.TimestampApplied {
+		t.Error("TimestampApplied=false, want true for level t")
+	}
+	xml := readFile(t, out)
+
+	// SHA-1 EVERYWHERE.
+	assertContains(t, xml, "http://www.w3.org/2000/09/xmldsig#rsa-sha1", "rsa-sha1 SignatureMethod")
+	assertContains(t, xml, "http://www.w3.org/2000/09/xmldsig#sha1", "sha1 DigestMethod")
+	if strings.Contains(xml, "rsa-sha256") || strings.Contains(xml, "xmlenc#sha256") {
+		t.Error("SHA-256 algorithm present but the auth profile is SHA-1 everywhere")
+	}
+	// C14N #WithComments on SignedInfo (enveloping quirk, matches capture).
+	assertContains(t, xml,
+		`<ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315#WithComments"/>`,
+		"WithComments C14N")
+	// SigningCertificate v1 present, V2 absent.
+	assertContains(t, xml, "<xades:SigningCertificate>", "v1 SigningCertificate")
+	if strings.Contains(xml, "SigningCertificateV2") {
+		t.Error("SigningCertificateV2 present but must be absent (v1 form required)")
+	}
+	// Enveloping FileObject holds the base64 of the 20 challenge bytes.
+	assertContains(t, xml, "<ds:Object", "enveloping ds:Object")
+	embedded := base64.StdEncoding.EncodeToString(challenge)
+	assertContains(t, xml, embedded, "base64 of the 20-byte challenge in FileObject")
+	// -T timestamp.
+	assertContains(t, xml, "<xades:SignatureTimeStamp", "SignatureTimeStamp")
+	assertContains(t, xml, "<xades:EncapsulatedTimeStamp", "EncapsulatedTimeStamp")
+	// No path leak.
+	if strings.Contains(xml, "<xades:Description>") {
+		t.Error("DataObjectFormat Description present; must not leak a path/name")
+	}
+
+	// Validate through DSS (no anchors ⇒ NO_CERTIFICATE_CHAIN_FOUND / INDETERMINATE
+	// for a throwaway cert is expected; it proves crypto + structure parse).
+	vr, err := Validate(context.Background(), ValidateInput{
+		XML:      []byte(xml),
+		JavaPath: javaPath,
+		JarPath:  jar,
+	})
+	if err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	if vr.SignatureID == "" {
+		t.Error("validator found no signature (structure did not parse)")
+	}
+	t.Logf("auth challenge: %d bytes; DSS indication=%s sub=%s", res.Bytes, vr.Indication, vr.SubIndication)
+}
+
 func sha256Sum(b []byte) []byte { s := sha256.Sum256(b); return s[:] }
 
 func readFile(t *testing.T, p string) string {

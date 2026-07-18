@@ -27,10 +27,21 @@ func (osascriptConfirmer) Confirm(ctx context.Context, req ConfirmRequest) (stri
 	if origin == "" {
 		origin = "(unknown site)"
 	}
-	message := fmt.Sprintf(
-		"%s is requesting a signature.\n\nFormat: %s\nContent: %s (%s)\n\n"+
-			"Enter your token PIN to authorize THIS operation, or Cancel to deny.",
-		origin, req.SignFormat, req.Filename, req.ContentType)
+	var message string
+	if req.IsAuth {
+		// mpass authentication/login challenge — make clear this authorizes a
+		// LOGIN to the requesting site, not a document signature.
+		message = fmt.Sprintf(
+			"%s is requesting to LOG YOU IN (authentication).\n\n"+
+				"Signing this challenge proves your identity to that site.\n\n"+
+				"Enter your token PIN to authorize THIS login, or Cancel to deny.",
+			origin)
+	} else {
+		message = fmt.Sprintf(
+			"%s is requesting a signature.\n\nFormat: %s\nContent: %s (%s)\n\n"+
+				"Enter your token PIN to authorize THIS operation, or Cancel to deny.",
+			origin, req.SignFormat, req.Filename, req.ContentType)
+	}
 
 	// `on run argv` keeps the untrusted message out of the script body. The PIN
 	// field uses `with hidden answer` so the PIN is never echoed on screen.

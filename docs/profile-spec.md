@@ -75,6 +75,51 @@ Algorithms (all levels):
     **values** form (XAdES-LT). If a consumer strictly requires -C, that is a
     structural mismatch to resolve with DSS's legacy API.
 
+### 1.1 mpass authentication XAdES-T — SHA-1 enveloping (interop-required)
+
+The mpass.gov.md login flow (`POST /sign/data`, PROTOCOL.md §5/§6) is the **same
+XAdES pipeline** with three deltas, dissected from the captured `auth.xades`:
+
+- **SHA-1 everywhere** (interop-mandated by the government auth protocol; NOT a
+  general default — documents stay SHA-256): SignatureMethod `rsa-sha1`
+  (`http://www.w3.org/2000/09/xmldsig#rsa-sha1`), every DigestMethod `sha1`
+  (`http://www.w3.org/2000/09/xmldsig#sha1`) — SignedProperties ref, file ref,
+  and `SigningCertificate/CertDigest`.
+- **Enveloping**: `data` is a ~20-byte SHA-1 pre-hash challenge, base64-wrapped
+  into a trailing `<ds:Object … Id="FileObject-…">` referenced by
+  `URI="#FileObject-…"`. C14N of SignedInfo is `…#WithComments` (as for document
+  enveloping).
+- Same as document XAdES otherwise: `SigningCertificate` v1 (not V2),
+  `SigningTime`, `SignedDataObjectProperties/DataObjectFormat`, and **-T**
+  `SignatureTimeStamp/EncapsulatedTimeStamp`. The **timestamp request digest stays
+  SHA-256** (independent of the signature digest; MDQTSA rejects SHA-1 and SHA-512
+  requests) and the timestamped SignatureValue is canonicalized with plain C14N.
+
+**Daemon routing heuristic** (`internal/server/tokensigner.go`, driven by
+`signFormat`+`contentType`, NEVER the request `algorithm` hint): `XAdES-T` +
+`contentType:"Text"` + `data ≤ 64 bytes` + not a `%PDF-` header ⇒ the mpass auth
+challenge → XAdES-T **enveloping SHA-1**. Any larger/PDF `XAdES-T` payload ⇒
+document XAdES-T **detached SHA-256**. The confirmation dialog is flagged
+`IsAuth` so it tells the user this authorizes a LOGIN to the requesting Origin.
+
+**Known divergences from the vendor `auth.xades`** (our signer delegates to EU
+DSS; the vendor rolled its own XAdES). Semantically all central items match
+(algorithms, C14N, SigningCertificate v1, SignatureTimeStamp), but DSS's
+enveloping mode differs in reference construction — flagged here because a real
+mpass round-trip (hardware-gated) is the only way to confirm acceptance:
+
+- **File reference transform** (semantic): DSS adds a `base64` `<ds:Transform>` so
+  the digest is over the decoded raw bytes; the vendor uses **no transform** (the
+  digest is SHA-1 of the C14N'd `ds:Object` element). Different digest inputs.
+- **SignedProperties reference transform** (semantic-ish): DSS adds an `exc-c14n`
+  transform; the vendor reference carries none.
+- **`ds:Object` `Encoding="UTF-8"`** (cosmetic): present in the vendor output,
+  absent from DSS's enveloping object.
+- **Reference `Id` naming** (cosmetic): DSS emits `r-id-…`; the vendor uses
+  `SignedProperties-Reference-…` / `SignedFile-Reference-…`.
+- **`DataObjectFormat/Description`** (intentional): the vendor leaks the signer's
+  local file path here; we **omit Description entirely** (anti-leak, by design).
+
 ---
 
 ## 2. PAdES (PDF)

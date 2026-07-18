@@ -32,13 +32,6 @@ var (
 	// confirmation dialog (§7). NO token access happens in this case.
 	ErrUserCancelled = errors.New("openmdsignd: signing cancelled by user")
 
-	// ErrAuthChallengeNotWired marks the mpass authentication path (a SHA-1
-	// signature over a pre-hashed challenge, PROTOCOL.md §5/§6). It is recognized
-	// but deliberately not wired: shipping an untested SHA-1 signature would be
-	// unsafe. See TODO(auth) below and docs/ROADMAP "Open probes".
-	ErrAuthChallengeNotWired = errors.New(
-		"openmdsignd: auth-challenge signing not yet wired — see task: Open probes (unverified SHA-1 pre-hash path)")
-
 	// ErrUnsupportedSignFormat is returned for a signFormat the Signer cannot map
 	// to a profile (the handler already rejects unknown formats at parse time;
 	// this guards the Signer as a standalone unit).
@@ -49,6 +42,12 @@ var (
 // document" heuristic. The captured challenge was a 20-byte SHA-1 digest
 // (PROTOCOL.md §5); a real document XAdES carries the full file in Data.
 const authChallengeMaxBytes = 64
+
+// authChallengeInputName is the neutral basename used to label the enveloping
+// FileObject reference for the mpass auth challenge. The vendor leaks a local
+// path here (…\signData_*.tmp); we deliberately do NOT — no filesystem path ever
+// reaches the signature.
+const authChallengeInputName = "authentication-challenge"
 
 // ConfirmRequest describes WHAT is about to be signed, for the synchronous
 // per-operation confirmation dialog (PROTOCOL.md §7). It names the requesting
@@ -63,6 +62,11 @@ type ConfirmRequest struct {
 	// Filename is a best-effort display name for the payload (the protocol does
 	// not carry one; the Signer synthesizes it from ContentType).
 	Filename string
+	// IsAuth is true for the mpass.gov.md authentication/login challenge (a short
+	// SHA-1 pre-hash, not a document). The confirmation dialog uses it to tell the
+	// user this authorizes a LOGIN to the requesting Origin, not a document
+	// signature.
+	IsAuth bool
 }
 
 // Confirmer performs the synchronous per-operation confirmation AND collects the
@@ -145,6 +149,7 @@ type signParams struct {
 	digest    string         // XAdES only; profile-driven, never the request hint
 	formatSeg string         // Location path segment: "pdf" | "XAdES"
 	inputName string         // synthesized display/basename (protocol carries none)
+	isAuth    bool           // true ⇒ mpass authentication/login challenge
 }
 
 // mapSignFormat is the pure SignFormat→profile mapping. It is separated from the
@@ -152,7 +157,7 @@ type signParams struct {
 //
 //   - "PAdES-T"                 → PAdES-T, SHA-256, input = full PDF, seg "pdf".
 //   - "XAdES-T" (document)      → XAdES-T detached, SHA-256, seg "XAdES".
-//   - "XAdES-T" (auth challenge)→ ErrAuthChallengeNotWired (see below).
+//   - "XAdES-T" (auth challenge)→ XAdES-T enveloping, SHA-1, seg "XAdES" (mpass).
 //   - anything else             → ErrUnsupportedSignFormat.
 func mapSignFormat(req SignRequest) (signParams, error) {
 	switch req.SignFormat {
@@ -165,12 +170,21 @@ func mapSignFormat(req SignRequest) (signParams, error) {
 		}, nil
 
 	case "XAdES-T":
-		// TODO(auth): the mpass authentication flow signs a short pre-hashed
-		// challenge with SHA-1 (PROTOCOL.md §5/§6). That path is UNVERIFIED and
-		// signing SHA-1 over an attacker-influenced pre-hash is exactly the kind
-		// of oracle we refuse to ship untested. We recognize it and stop.
+		// The mpass.gov.md authentication flow signs a short pre-hashed challenge
+		// (a ~20-byte SHA-1 value, contentType "Text") as an ENVELOPING XAdES-T
+		// with SHA-1 everywhere (PROTOCOL.md §5/§6, verified against the captured
+		// auth.xades). SHA-1 is interop-required by the government protocol here;
+		// it is NOT used for document signing.
 		if isAuthChallenge(req) {
-			return signParams{}, ErrAuthChallengeNotWired
+			return signParams{
+				profile:   "xades",
+				level:     sign.LevelT,
+				packaging: sign.PackagingEnveloping,
+				digest:    "sha1",
+				formatSeg: "XAdES",
+				inputName: authChallengeInputName,
+				isAuth:    true,
+			}, nil
 		}
 		// Document XAdES: a full document in Data, detached, SHA-256.
 		return signParams{
@@ -189,10 +203,11 @@ func mapSignFormat(req SignRequest) (signParams, error) {
 }
 
 // isAuthChallenge distinguishes the mpass authentication challenge from a real
-// document XAdES. Heuristic (documented, since the flow is unverified): the
-// payload is Text AND small (≤ authChallengeMaxBytes, matching a ~20-byte SHA-1
-// pre-hash) AND not a PDF. A genuine document XAdES carries the full file bytes,
-// which are larger and/or a recognizable document.
+// document XAdES. Heuristic: the payload is Text AND small (≤
+// authChallengeMaxBytes, matching a ~20-byte SHA-1 pre-hash) AND not a PDF. A
+// genuine document XAdES carries the full file bytes, which are larger and/or a
+// recognizable document. The two profiles are otherwise disjoint: auth = Text +
+// small pre-hash → SHA-1 enveloping; document XAdES → SHA-256 detached.
 func isAuthChallenge(req SignRequest) bool {
 	return req.ContentType == "Text" &&
 		len(req.Data) > 0 &&
@@ -248,6 +263,7 @@ func (ts *TokenSigner) Sign(ctx context.Context, req SignRequest) (SignResult, e
 		ContentType: req.ContentType,
 		SignFormat:  req.SignFormat,
 		Filename:    params.inputName,
+		IsAuth:      params.isAuth,
 	})
 	if err != nil {
 		// A cancel/deny aborts before ANY token access. Normalize to the typed

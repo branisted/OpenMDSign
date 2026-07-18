@@ -248,10 +248,6 @@ func (s *Server) handleSign(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrSignerNotImplemented):
 			s.writeError(w, http.StatusNotImplemented,
 				"signing not yet implemented (Daemon Phase C); request parsed and validated OK")
-		case errors.Is(err, ErrAuthChallengeNotWired):
-			// The mpass auth-challenge XAdES path (SHA-1 over a pre-hash) is
-			// recognized but deliberately not wired (unverified). 501, not 500.
-			s.writeError(w, http.StatusNotImplemented, err.Error())
 		case errors.Is(err, ErrUserCancelled):
 			// The user declined the per-operation confirmation dialog (§7). No
 			// token access occurred. The exact vendor error shape for a cancel
