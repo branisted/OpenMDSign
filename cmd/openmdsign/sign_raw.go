@@ -17,8 +17,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/branistedev/openmdsign/internal/token"
-	"github.com/branistedev/openmdsign/internal/x509util"
+	"github.com/branisted/openmdsign/internal/token"
+	"github.com/branisted/openmdsign/internal/x509util"
 )
 
 // rawMechanism describes how a --mechanism value maps to an on-token operation.

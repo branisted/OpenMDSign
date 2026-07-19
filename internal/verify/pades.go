@@ -12,7 +12,7 @@ import (
 	"github.com/digitorus/pkcs7"
 	"github.com/digitorus/timestamp"
 
-	"github.com/branistedev/openmdsign/internal/verify/anchors"
+	"github.com/branisted/openmdsign/internal/verify/anchors"
 )
 
 // oidSignatureTimeStampToken is the CMS unsigned attribute carrying the RFC 3161

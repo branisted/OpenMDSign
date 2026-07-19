@@ -101,7 +101,7 @@ make release GOOS=darwin GOARCH=arm64   # -> dist/openmdsign-<ver>-darwin-arm64.
 The XAdES path needs the helper jar at runtime; point to it with `--dss-helper`
 or `$OPENMDSIGN_DSS_HELPER` (default `java/dss-helper/target/dss-helper.jar`).
 
-> The Go module is `github.com/branistedev/openmdsign`; rename the `module` line
+> The Go module is `github.com/branisted/openmdsign`; rename the `module` line
 > in `go.mod` and the `internal/` imports if you fork it elsewhere.
 
 ## CLI: `openmdsign`

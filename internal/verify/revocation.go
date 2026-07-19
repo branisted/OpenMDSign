@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/crypto/ocsp"
 
-	"github.com/branistedev/openmdsign/internal/verify/anchors"
+	"github.com/branisted/openmdsign/internal/verify/anchors"
 )
 
 type revResult struct {

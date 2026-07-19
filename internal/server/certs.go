@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/branistedev/openmdsign/internal/token"
+	"github.com/branisted/openmdsign/internal/token"
 )
 
 // TokenCertificate is one raw certificate discovered on a PKCS#11 token, plus

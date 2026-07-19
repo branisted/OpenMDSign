@@ -9,7 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 
-	"github.com/branistedev/openmdsign/internal/token"
+	"github.com/branisted/openmdsign/internal/token"
 	"math/big"
 	"testing"
 	"time"

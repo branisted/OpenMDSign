@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/branistedev/openmdsign/internal/sign"
-	"github.com/branistedev/openmdsign/internal/sign/pades"
-	"github.com/branistedev/openmdsign/internal/verify/anchors"
+	"github.com/branisted/openmdsign/internal/sign"
+	"github.com/branisted/openmdsign/internal/sign/pades"
+	"github.com/branisted/openmdsign/internal/verify/anchors"
 )
 
 func TestAnchorsLoad(t *testing.T) {

@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/branistedev/openmdsign/internal/sign"
+	"github.com/branisted/openmdsign/internal/sign"
 )
 
 // TestXAdESIntegration drives the full two-step external-signing flow against

@@ -14,10 +14,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/branistedev/openmdsign/internal/sign"
-	"github.com/branistedev/openmdsign/internal/sign/pades"
-	"github.com/branistedev/openmdsign/internal/sign/xades"
-	"github.com/branistedev/openmdsign/internal/token"
+	"github.com/branisted/openmdsign/internal/sign"
+	"github.com/branisted/openmdsign/internal/sign/pades"
+	"github.com/branisted/openmdsign/internal/sign/xades"
+	"github.com/branisted/openmdsign/internal/token"
 )
 
 // defaultTSAURL is the observed MoldSign RFC 3161 timestamp authority.

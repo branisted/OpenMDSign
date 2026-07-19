@@ -4,7 +4,7 @@ import (
 	"crypto"
 	"testing"
 
-	"github.com/branistedev/openmdsign/internal/sign"
+	"github.com/branisted/openmdsign/internal/sign"
 )
 
 func TestResolvePackaging(t *testing.T) {

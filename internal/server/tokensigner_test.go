@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/branistedev/openmdsign/internal/sign"
+	"github.com/branisted/openmdsign/internal/sign"
 )
 
 // --- SignFormat → params mapping (pure, no hardware) ------------------------

@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/beevik/etree"
-	"github.com/branistedev/openmdsign/internal/sign"
+	"github.com/branisted/openmdsign/internal/sign"
 	"github.com/digitorus/timestamp"
 	dsig "github.com/russellhaering/goxmldsig"
 )

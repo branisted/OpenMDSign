@@ -1,4 +1,4 @@
-module github.com/branistedev/openmdsign
+module github.com/branisted/openmdsign
 
 go 1.26
 

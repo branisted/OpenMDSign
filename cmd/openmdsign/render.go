@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/branistedev/openmdsign/internal/token"
-	"github.com/branistedev/openmdsign/internal/x509util"
+	"github.com/branisted/openmdsign/internal/token"
+	"github.com/branisted/openmdsign/internal/x509util"
 )
 
 func emitText(rep *token.Report, outdir string) {

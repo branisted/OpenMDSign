@@ -32,7 +32,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/branistedev/openmdsign/internal/sign"
+	"github.com/branisted/openmdsign/internal/sign"
 )
 
 // Profile is the profile name produced by this Signer.

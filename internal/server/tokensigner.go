@@ -14,11 +14,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/branistedev/openmdsign/internal/sign"
-	"github.com/branistedev/openmdsign/internal/sign/pades"
-	"github.com/branistedev/openmdsign/internal/sign/xades"
-	"github.com/branistedev/openmdsign/internal/sign/xadesauth"
-	"github.com/branistedev/openmdsign/internal/token"
+	"github.com/branisted/openmdsign/internal/sign"
+	"github.com/branisted/openmdsign/internal/sign/pades"
+	"github.com/branisted/openmdsign/internal/sign/xades"
+	"github.com/branisted/openmdsign/internal/sign/xadesauth"
+	"github.com/branisted/openmdsign/internal/token"
 )
 
 // DefaultTSAURL is the observed MoldSign RFC 3161 timestamp authority, used by

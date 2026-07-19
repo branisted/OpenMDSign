@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/branistedev/openmdsign/internal/sign/xades"
+	"github.com/branisted/openmdsign/internal/sign/xades"
 )
 
 // fileRefRe matches a detached signed-file reference URI="file:/<name>".

@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/branistedev/openmdsign/internal/verify"
+	"github.com/branisted/openmdsign/internal/verify"
 )
 
 // Exit codes for `verify`. 0 = VALID; INVALID/INDETERMINATE are non-zero and

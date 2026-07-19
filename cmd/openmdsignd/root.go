@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/branistedev/openmdsign/internal/config"
-	"github.com/branistedev/openmdsign/internal/server"
+	"github.com/branisted/openmdsign/internal/config"
+	"github.com/branisted/openmdsign/internal/server"
 )
 
 // globalFlags are shared across openmdsignd subcommands.

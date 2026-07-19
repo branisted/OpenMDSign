@@ -22,7 +22,7 @@ import (
 	"github.com/digitorus/pkcs7"
 	"github.com/digitorus/timestamp"
 
-	"github.com/branistedev/openmdsign/internal/sign"
+	"github.com/branisted/openmdsign/internal/sign"
 )
 
 // oidSigningCertificateV2 is the ESS signingCertificateV2 signed-attribute OID.

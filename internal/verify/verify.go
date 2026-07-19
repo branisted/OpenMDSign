@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/branistedev/openmdsign/internal/verify/anchors"
+	"github.com/branisted/openmdsign/internal/verify/anchors"
 )
 
 // Overall is the top-level verdict.

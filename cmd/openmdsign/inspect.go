@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/branistedev/openmdsign/internal/config"
-	"github.com/branistedev/openmdsign/internal/token"
-	"github.com/branistedev/openmdsign/internal/x509util"
+	"github.com/branisted/openmdsign/internal/config"
+	"github.com/branisted/openmdsign/internal/token"
+	"github.com/branisted/openmdsign/internal/x509util"
 )
 
 type inspectFlags struct {
