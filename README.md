@@ -44,6 +44,50 @@ Both produce standard AdES signatures that validate on the official verifiers:
   - **Java 21 + Maven** — only for **XAdES** signing/verification, which delegates
     to a bundled [EU DSS](https://github.com/esig/dss) helper. PAdES is pure Go.
 
+## Obtaining the PKCS#11 driver
+
+openmdsign ships no driver. You point it at one already installed on your
+machine — the module path is always configuration, never hardcoded.
+
+**Where drivers come from.** Install the middleware for your token from its
+vendor: [SafeNet Authentication Client](https://cpl.thalesgroup.com/access-management/security-applications/authentication-client-token-management)
+(Thales — SafeNet eToken, IDPrime), [Bit4id Universal Middleware](https://cdn.bit4id.com/es/middleware.htm),
+or the ACS kit for ACOS5/CryptoMate. Installing the MoldSign desktop app also
+places a set of drivers under `/Applications/STISC/MoldSign/native_lib/`.
+
+**Finding the module after install.** Vendor installers don't advertise where
+the `.dylib` lands. To look inside a distribution you downloaded:
+
+```sh
+hdiutil attach Middleware.dmg                  # mount a .dmg -> /Volumes/...
+pkgutil --expand-full Installer.pkg out/       # expand a .pkg incl. payloads
+xar -xf Installer.pkg -C out/                  # older .pkg / flat archives
+find /Volumes /Applications out -name '*pkcs11*.dylib' -o -name 'lib*.dylib'
+```
+
+An `.app` is just a directory — `ls` into `Contents/` and look for `native_lib/`,
+`Frameworks/`, or `MacOS/`. All of the above is stock Apple tooling reading files
+you already have; none of it involves modifying, disassembling, or repackaging
+the vendor's software.
+
+**Check it before you use it.** Architecture must match your `openmdsign` binary,
+and it's worth confirming the library is the vendor's genuine signed artifact:
+
+```sh
+lipo -archs libeToken.dylib        # need arm64 for an arm64 build
+codesign -dv libeToken.dylib       # Authority / TeamIdentifier
+openmdsign inspect --module ./libeToken.dylib   # library info, slots, certs
+```
+
+See [`docs/recon.md`](docs/recon.md) for the architecture and PKCS#11 version of
+each driver in the MoldSign set — notably `libacos5pkcs11.dylib`, which has no
+arm64 slice and cannot load in an arm64 build.
+
+> **Keep drivers out of this repo.** These libraries are proprietary and carry no
+> redistribution grant; some are licence-gated at runtime. Extract them for your
+> own machine, but don't commit or republish them — see the interoperability
+> statement above. `moldsign2412unbundled/` is gitignored for this reason.
+
 ## Build
 
 ```sh

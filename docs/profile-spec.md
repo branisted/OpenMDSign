@@ -153,15 +153,6 @@ Note the asymmetry: XAdES uses the old `SigningCertificate`; PAdES CMS uses
 | PAdES-B-T (PDF) | `github.com/digitorus/pdfsign` + `digitorus/timestamp` (pure Go) | Go `crypto.Signer` via crypto11 — token stays in Go, no JVM |
 | XAdES-BES/T/C (files) | EU DSS (Java) helper | **Two-step external signing**: DSS returns data-to-be-sign; Go signs on-token; DSS assembles. PIN never leaves Go. |
 
-**Recommended first target: PAdES-B-T** — pure Go, exercises the whole pipeline
-(token → AdES container → semnatura.md) with no JVM, reusing the validated Phase 1
-token signing. Then XAdES-T detached via the DSS helper.
-
-**Recommended XAdES primary: XAdES-T, detached** — detached uses plain C14N (no
-WithComments quirk), digest over raw bytes (simplest, most robust), and -T carries
-trusted time. BES is a stepping stone; -C only if a consumer demands the legacy
-references form.
-
 ### TSA verification (2026-07-18)
 
 The TSA `http://tsp.pki.gov.md/moldsign2/` was probed with a standard RFC 3161

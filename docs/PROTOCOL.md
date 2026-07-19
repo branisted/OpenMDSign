@@ -1,7 +1,7 @@
 # PROTOCOL.md — the browser ⇄ MoldSign Server localhost contract
 
 > **Status: FROZEN (v1) — 2026-07-18.** Reverse-engineered from live captures on a
-> Windows 10 host (`DESKTOP-L31D4KK`) running the official **MoldSign Server 2.4.12**
+> Windows 11 host running the official **MoldSign Server 2.4.13**
 > against `msign.gov.md` (document sign) and `mpass.gov.md` (authentication).
 > Source artifacts: `scripts/recon-windows.ps1` output + `sign.har` / `login.har`
 > (kept out of the repo — they embed a real qualified certificate and personal
@@ -196,15 +196,3 @@ The page then posts `base64File` onward to the msign/mpass back-end (the outer
   loading them must be a **386 build** (or ship 64-bit vendor drivers).
 - **Confirmation gate:** the synchronous `201` is exactly where our native PIN +
   per-operation confirmation dialog belongs.
-
----
-
-## 8. Still to confirm (does not block Phase B start)
-1. CORS allowlist scope — reflect-any vs gov-allowlist (§3). Re-probe with a
-   non-gov Origin.
-2. A **document XAdES** sample (msign signing a non-PDF) to see whether document
-   XAdES uses SHA-256 while auth XAdES uses SHA-1.
-3. Error/negative paths: no token present, user cancels, wrong PIN — response
-   shapes the page expects.
-4. Exact `localhost.cts.md` DNS record (public A → 127.0.0.1) and whether the
-   installer also writes a hosts entry as a fallback.

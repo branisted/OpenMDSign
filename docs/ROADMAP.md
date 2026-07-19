@@ -41,7 +41,6 @@ is not a separate project — it is a second consumer of the core.
 **Remaining / optional:**
 - ▫ **P4 LTV** — PDF `/DSS` store + XAdES-C references (archival long-term validity; optional).
 - ▫ **Open probes** — CORS allowlist scope re-check; document-XAdES-over-non-PDF digest confirmation.
-- 🧪 **mpass in-browser confirmation** — sign a real login and confirm mpass.gov.md accepts the DSS-built XAdES.
 
 **Explicitly dropped (user scope):** Homebrew/notarized-dmg packaging (P5); launchd auto-start (Daemon E) — the daemon runs standalone via `openmdsignd serve` on demand.
 
