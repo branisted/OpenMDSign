@@ -45,7 +45,10 @@ release: jar
 	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -trimpath -ldflags "$(LDFLAGS)" \
 		-o $(DIST)/openmdsign-$(VERSION)-$(GOOS)-$(GOARCH)/openmdsignd ./cmd/openmdsignd
 	cp $(JAR) $(DIST)/openmdsign-$(VERSION)-$(GOOS)-$(GOARCH)/dss-helper.jar
-	cp README.md LICENSE $(DIST)/openmdsign-$(VERSION)-$(GOOS)-$(GOARCH)/ 2>/dev/null || true
+#   License files are a redistribution requirement (dss-helper.jar embeds
+#   LGPL-2.1 EU DSS) — no `|| true`, this must fail loudly if any are missing.
+	cp README.md LICENSE THIRD-PARTY-NOTICES.md $(DIST)/openmdsign-$(VERSION)-$(GOOS)-$(GOARCH)/
+	cp -R licenses $(DIST)/openmdsign-$(VERSION)-$(GOOS)-$(GOARCH)/licenses
 	cd $(DIST) && tar -czf openmdsign-$(VERSION)-$(GOOS)-$(GOARCH).tar.gz openmdsign-$(VERSION)-$(GOOS)-$(GOARCH)
 	@echo "release: $(DIST)/openmdsign-$(VERSION)-$(GOOS)-$(GOARCH).tar.gz"
 

@@ -14,11 +14,11 @@ ships two front-ends over one signing core:
 Both produce standard AdES signatures that validate on the official verifiers:
 **PAdES-B-T** for PDFs and **XAdES-T** for arbitrary files.
 
-> **Status.** Document signing works end-to-end and is validated on real
-> infrastructure (PAdES via the msign.gov.md verifier; XAdES in the MoldSign
-> desktop app; msign document signing confirmed in-browser through the daemon).
-> The mpass.gov.md **login** flow is implemented but its in-browser acceptance is
-> not yet confirmed on hardware. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+> **Status.** Both signing and authentication work end-to-end and are validated
+> on real infrastructure: PAdES via the msign.gov.md verifier; XAdES in the
+> MoldSign desktop app; msign document signing confirmed in-browser through the
+> daemon; and **mpass.gov.md login confirmed working in-browser on hardware**.
+> See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Legal / interoperability statement
 
@@ -200,3 +200,8 @@ docs/               ROADMAP, PROTOCOL, profile-spec, decisions, recon
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
+
+Built release artifacts bundle third-party components under other licenses —
+notably **EU DSS (LGPL-2.1)**, embedded in `dss-helper.jar`. See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for the full inventory and the
+obligations that apply if you redistribute a release tarball.

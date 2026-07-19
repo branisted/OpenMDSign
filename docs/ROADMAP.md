@@ -58,7 +58,7 @@ is not a separate project — it is a second consumer of the core.
 | Core/CLI | P4 LTV / XAdES-C, `/DSS` store | ▫ todo (optional — long-term validation) |
 | Core/CLI | ~~P5 packaging (brew, notarized dmg)~~ | ✗ dropped — GitHub-repo-only, bins only |
 | Daemon | msign document signing in-browser | ✅ **works end-to-end (user-confirmed)** |
-| Daemon | mpass auth (XAdES SHA-1 challenge) | ✅ wired — XAdES-T **enveloping SHA-1** over the 20-byte challenge (token SHA-1 DigestInfo + DSS SHA-1 path); DSS-validated; not yet hardware/mpass round-trip tested (see divergences note) |
+| Daemon | mpass auth (XAdES SHA-1 challenge) | ✅ **works end-to-end — browser-confirmed on hardware (2026-07-18)**; XAdES-T **enveloping SHA-1** over the 20-byte challenge via the dedicated Go signer (`internal/sign/xadesauth`) matching the vendor byte-structure |
 | Daemon | A protocol freeze (`PROTOCOL.md`) | ✅ done |
 | Daemon | B skeleton: HTTPS loopback + 3 routes + CORS + `/certificates` | ✅ done, merged |
 | Daemon | C wire signers + sync PIN/confirm gate | ✅ done, merged (PAdES/XAdES doc signing + native PIN/confirm; mpass auth-challenge now wired) |
